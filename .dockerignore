@@ -1,0 +1,7 @@
+build.log
+tmp/
+M_Seurat_object.rds
+ShinyApp/shinyApp/backupFiles/
+ShinyApp/shinyApp/final_staged_object.rds
+ShinyApp/shinyApp/specificCellID.rds
+ShinyApp/shinyApp/Rplots.pdf

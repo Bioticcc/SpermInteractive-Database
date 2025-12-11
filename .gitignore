@@ -1,0 +1,22 @@
+# R / RStudio artifacts
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Large data objects (avoid pushing huge files)
+*.rds
+*.RDS
+*.h5
+
+# Local / temp files
+tmp/
+build.log
+
+# Backup files
+ShinyApp/shinyApp/backupFiles/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode/

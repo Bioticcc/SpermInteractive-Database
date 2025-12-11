@@ -1,0 +1,10 @@
+name: shinyapp
+title:
+username: ward-bio
+account: ward-bio
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 14795690
+bundleId: 10315647
+url: https://ward-bio.shinyapps.io/shinyapp/
+version: 1
