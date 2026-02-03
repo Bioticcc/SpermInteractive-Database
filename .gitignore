@@ -18,6 +18,7 @@ tmp/
 tmp
 build.log
 rsconnect/
+Rplots.pdf
 
 # Backup files
 ShinyApp/shinyApp/backupFiles/
@@ -33,3 +34,4 @@ ShinyApp/shinyApp/backupFiles/
 .DS_Store
 Thumbs.db
 .vscode/
+*:Zone.Identifier
