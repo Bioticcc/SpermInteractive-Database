@@ -8,13 +8,26 @@
 *.rds
 *.RDS
 *.h5
+*.h5ad
+*.h5seurat
+*.loom
+*.qs
 
 # Local / temp files
 tmp/
+tmp
 build.log
+rsconnect/
 
 # Backup files
 ShinyApp/shinyApp/backupFiles/
+
+# Secrets (never commit)
+.Renviron
+.Renviron.*
+.Rprofile
+.env
+.env.*
 
 # OS/editor cruft
 .DS_Store

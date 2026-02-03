@@ -15,8 +15,8 @@ if (interactive()) {
   if (!requireNamespace("rsconnect", quietly = TRUE)) {
     install.packages("rsconnect")
   }
-  #rsconnect::setAccountInfo(name='ward-bio', token='249C58EF9B00B29C7AC7CC88738ABF0B', secret='4dvBaA+uTQDtaPLcubVlf5tFggZahoDfbG5ZOtvO')
-  #rsconnect::deployApp(appDir = "/home/biotic/ShinyApp Project/ShinyApp/shinyApp", appName = "EyeSpySpermatogonia")
+  rsconnect::setAccountInfo(name='ward-bio', token='NUH-UH', secret='ItsASecret :P')
+  rsconnect::deployApp(appDir = "/home/biotic/ShinyApp Project/ShinyApp/shinyApp", appName = "SpermInteractive")
 }
 #--------------------------------------->
 

@@ -10,13 +10,16 @@ library(bslib)
 library(plotly)
 
 theme_light <- "lightblue"
-theme_default <- "dark"
+theme_dark <- "dark"
 
-sc1conf = readRDS("sc1conf.rds")
-sc1def  = readRDS("sc1def.rds")
+# Default theme on first load (may be overridden by localStorage).
+theme_default <- theme_light
 
-sc2conf = readRDS("sc2conf.rds")
-sc2def  = readRDS("sc2def.rds")
+# sc1conf = readRDS("sc1conf.rds")
+# sc1def  = readRDS("sc1def.rds")
+
+# sc2conf = readRDS("sc2conf.rds")
+# sc2def  = readRDS("sc2def.rds")
 
 sc3conf = readRDS("sc3conf.rds")
 sc3def  = readRDS("sc3def.rds")
@@ -98,7 +101,7 @@ tags$head(
       var STORAGE_KEY = 'sc-theme';
       var DARK_THEME = '%s';
       var LIGHT_THEME = '%s';
-      var START_THEME = DARK_THEME;
+      var START_THEME = '%s';
       var root = document.documentElement;
       var pendingTheme = null;
 
@@ -151,22 +154,35 @@ tags$head(
         });
       }
 
-      function init() {
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', bindToggle);
-        } else {
-          bindToggle();
-        }
-        document.addEventListener('shiny:connected', bindToggle);
-      }
+	      function init() {
+	        if (document.readyState === 'loading') {
+	          document.addEventListener('DOMContentLoaded', bindToggle);
+	        } else {
+	          bindToggle();
+	        }
+	        function whenShinyReady(callback) {
+	          var tries = 0;
+	          (function tick() {
+	            if (window.Shiny && typeof Shiny.setInputValue === 'function') {
+	              callback();
+	              return;
+	            }
+	            if (tries++ < 200) {
+	              setTimeout(tick, 100);
+	            }
+	          })();
+	        }
+	
+	        // Ensure the server always receives an initial theme value (even if Shiny
+	        // wasn't available when bindToggle() first ran).
+	        whenShinyReady(function() {
+	          notifyShiny(pendingTheme || root.getAttribute('data-theme') || START_THEME);
+	        });
+	      }
 
-      document.addEventListener('shiny:connected', function() {
-        notifyShiny(pendingTheme || root.getAttribute('data-theme') || START_THEME);
-      });
-
-      init();
-    })();
-  ", theme_default, theme_light))),
+	      init();
+	    })();
+	  ", theme_dark, theme_light, theme_default))),
   tags$link(
     href = "https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap", 
     rel = "stylesheet"
@@ -178,7 +194,7 @@ tags$head(
   # (A) Optional: tiny CSS for on-SVG numeric labels
   tags$style(HTML("
     .heat-label{
-      font: 10px/1 monospace;
+      font: 15px/1 monospace;
       fill:#111;
       text-anchor: middle;
       dominant-baseline: central;
@@ -587,44 +603,110 @@ navbarPage(
   id = "mainTabs",          # add an id so we can reference tabs
   header = tagList(
     tags$script(HTML("
-      (function bootstrapNavAutoClose() {
-        function waitFor(condition, callback, interval) {
-          interval = interval || 75;
-          if (condition()) {
-            callback();
-          } else {
-            setTimeout(function() { waitFor(condition, callback, interval); }, interval);
-          }
+    (function bootstrapNavAutoClose() {
+      function waitFor(condition, callback, interval) {
+        interval = interval || 75;
+        if (condition()) {
+          callback();
+        } else {
+          setTimeout(function() { waitFor(condition, callback, interval); }, interval);
         }
-        waitFor(function() { return !!window.jQuery; }, function() {
-          var $ = window.jQuery;
-          function closeAllDropdowns(source) {
-            var $open = $('.navbar .dropdown.open');
-            if (!$open.length) { return; }
-            $open.each(function() {
-              var $dropdown = $(this);
-              $dropdown.removeClass('open');
-              $dropdown.find('> a[data-toggle=\"dropdown\"]').attr('aria-expanded', 'false').blur();
+      }
+      window.navToTab = function(target, el) {
+        if (el && el.blur) { el.blur(); }
+        if (window.Shiny && typeof Shiny.setInputValue === 'function') {
+          Shiny.setInputValue('home_card_nav', target, {priority: 'event'});
+        }
+        if (window.closeAllNavbarDropdowns) {
+          window.closeAllNavbarDropdowns('home-card');
+          window.setTimeout(function() { window.closeAllNavbarDropdowns('home-card'); }, 200);
+        }
+        return false;
+      };
+      waitFor(function() { return !!window.jQuery; }, function() {
+        var $ = window.jQuery;
+	          function closeAllDropdowns(source) {
+	            var $dropdowns = $('.navbar .dropdown');
+	            if (!$dropdowns.length) { return; }
+	            $dropdowns.each(function() {
+	              var $dropdown = $(this);
+	              var $menu = $dropdown.find('.dropdown-menu');
+              $dropdown.removeClass('open show');
+              $menu.removeClass('show');
+              $dropdown
+                .find('> a[data-toggle=\"dropdown\"], > a[data-bs-toggle=\"dropdown\"]')
+                .attr('aria-expanded', 'false')
+                .blur();
             });
-            $('.dropdown-backdrop').remove();
-          }
-          $(document).on('shown.bs.tab', '#mainTabs a[data-toggle=\"tab\"]', function() {
-            window.setTimeout(function() { closeAllDropdowns('shown'); }, 160);
-          });
-          waitFor(
-            function() { return window.Shiny && window.Shiny.addCustomMessageHandler; },
-            function() {
-              Shiny.addCustomMessageHandler('close-nav-dropdown', function() {
-                window.setTimeout(function() { closeAllDropdowns('message'); }, 160);
+            if (window.bootstrap && window.bootstrap.Dropdown) {
+              $('.navbar .dropdown-toggle').each(function() {
+                var inst = window.bootstrap.Dropdown.getInstance(this);
+                if (inst) { inst.hide(); }
               });
             }
-          );
+	            $('.dropdown-backdrop').remove();
+	          }
+	          function resizePlotlyActive() {
+	            if (!(window.Plotly && window.Plotly.Plots && typeof window.Plotly.Plots.resize === 'function')) {
+	              return;
+	            }
+	            function resizePlotly(el) {
+	              if (!el) return;
+	              try { window.Plotly.Plots.resize(el); } catch (err) { /* ignore */ }
+	              if (typeof window.Plotly.relayout === 'function') {
+	                try { window.Plotly.relayout(el, {autosize: true}); } catch (err2) { /* ignore */ }
+	              }
+	            }
+	            var pane = document.querySelector('.tab-pane.active');
+	            if (!pane) { return; }
+	            var ccc = document.getElementById('ccc_heatmap');
+	            if (ccc && pane.contains(ccc)) {
+	              resizePlotly(ccc);
+	            }
+	            var nodes = pane.querySelectorAll('.plotly.html-widget');
+	            Array.prototype.forEach.call(nodes, function(el) {
+	              resizePlotly(el);
+	            });
+	          }
+	          function schedulePlotlyResizes() {
+	            window.setTimeout(resizePlotlyActive, 120);
+	            window.setTimeout(resizePlotlyActive, 360);
+	            window.setTimeout(resizePlotlyActive, 900);
+	            window.setTimeout(resizePlotlyActive, 1800);
+	          }
+	          $(document).on('shown.bs.tab', '#mainTabs a[data-toggle=\"tab\"], #mainTabs a[data-bs-toggle=\"tab\"], #mainTabs a[role=\"tab\"]', function() {
+	            window.setTimeout(function() { closeAllDropdowns('shown'); }, 160);
+	            schedulePlotlyResizes();
+	          });
+	          $(document).on('shiny:inputchanged', function(event) {
+	            if (!event || event.name !== 'mainTabs') return;
+	            window.setTimeout(function() { closeAllDropdowns('mainTabs'); }, 160);
+	            schedulePlotlyResizes();
+	          });
+	          waitFor(function() { return !!document.getElementById('theme-toggle'); }, function() {
+	            var toggle = document.getElementById('theme-toggle');
+	            if (toggle) {
+	              toggle.addEventListener('change', schedulePlotlyResizes);
+	            }
+	          });
+	          $(window).on('resize', function() {
+	            window.setTimeout(resizePlotlyActive, 60);
+	          });
+	          waitFor(
+	            function() { return window.Shiny && window.Shiny.addCustomMessageHandler; },
+	            function() {
+	              Shiny.addCustomMessageHandler('close-nav-dropdown', function(payload) {
+	                var delay = (payload && payload.delay) ? payload.delay : 160;
+	                window.setTimeout(function() { closeAllDropdowns('message'); }, delay);
+	              });
+	            }
+	          );
           window.closeAllNavbarDropdowns = function() { closeAllDropdowns('direct'); };
         });
       })();
     "))
     ,
-    tags$script(src = "upload.js")
+#     tags$script(src = "upload.js")
   ),
   selected = "home",        # make Home the default landing page
   
@@ -639,8 +721,8 @@ navbarPage(
         div(class = "home-card home-hero",
             h2("Welcome"),
             p("This database allows you to explore single-cell datasets and generate publication-ready figures for download.", br(),
-              "All interactive views are powered by our curated Seurat objects from the associated paper;", br(),
-              "user uploads are not required (or supported) at this time.")
+              "Currently, the database includes the Staged Testis dataset, with more datasets to be added in the future,", br(), 
+              "such as developmental testis/sertolis subset.",br())
         )
       ),
       column(
@@ -648,7 +730,7 @@ navbarPage(
         div(class = "home-card get-started",
             h3("Get Started"),
             tags$ol(
-              tags$li("Open a dataset tab from the navigation bar."),
+              tags$li("Open the Staged Testis or Interactive Data tabs from the navigation bar."),
               tags$li("Pick a figure type and set filters (genes, stages, cell groups)."),
               tags$li("Customize aesthetics and download your figure.")
             ),
@@ -673,7 +755,7 @@ navbarPage(
                   role = "button",
                   tabindex = "0",
                   `data-target-tab` = "spermatogonia_table",
-                  onclick = "Shiny.setInputValue('home_card_nav', this.getAttribute('data-target-tab'), {priority: 'event'}); this.blur(); if (window.closeAllNavbarDropdowns) { window.closeAllNavbarDropdowns(); } return false;",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
                   div(
                     class = "home-card",
                     tags$img(
@@ -695,7 +777,7 @@ navbarPage(
                   role = "button",
                   tabindex = "0",
                   `data-target-tab` = "retinoic_acid",
-                  onclick = "Shiny.setInputValue('home_card_nav', this.getAttribute('data-target-tab'), {priority: 'event'}); this.blur(); if (window.closeAllNavbarDropdowns) { window.closeAllNavbarDropdowns(); } return false;",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
                   div(
                     class = "home-card",
                     tags$img(
@@ -717,7 +799,7 @@ navbarPage(
                   role = "button",
                   tabindex = "0",
                   `data-target-tab` = "retinoic_acid_line",
-                  onclick = "Shiny.setInputValue('home_card_nav', this.getAttribute('data-target-tab'), {priority: 'event'}); this.blur(); if (window.closeAllNavbarDropdowns) { window.closeAllNavbarDropdowns(); } return false;",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
                   div(
                     class = "home-card",
                     tags$img(
@@ -739,7 +821,7 @@ navbarPage(
                   role = "button",
                   tabindex = "0",
                   `data-target-tab` = "cell2cell_heatmaps",
-                  onclick = "Shiny.setInputValue('home_card_nav', this.getAttribute('data-target-tab'), {priority: 'event'}); this.blur(); if (window.closeAllNavbarDropdowns) { window.closeAllNavbarDropdowns(); } return false;",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
                   div(
                     class = "home-card",
                     tags$img(
@@ -772,141 +854,141 @@ navbarPage(
     build_proportion_plot_tab("sc3", sc3conf, sc3def, "Staged Testis"),
     build_bubble_heatmap_tab("sc3", sc3conf, sc3def, "Staged Testis")
   ),
-  navbarMenu(
-    "Developemental Testis",
-    build_cellinfo_gene_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-    build_cellinfo_cellinfo_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-    build_gene_gene_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-    build_gene_coexpression_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-    build_violin_boxplot_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-    build_proportion_plot_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-    build_bubble_heatmap_tab("sc1", sc1conf, sc1def, "Developmental Testis")
-  ),
-  navbarMenu(
-    "Developemental Sertolis",
-    build_cellinfo_gene_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-    build_cellinfo_cellinfo_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-    build_gene_gene_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-    build_gene_coexpression_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-    build_violin_boxplot_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-    build_proportion_plot_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-    build_bubble_heatmap_tab("sc2", sc2conf, sc2def, "Developmental Sertolis")
-  ),
-  navbarMenu(
-    "User Upload",
-    tabPanel(
-      "Upload",
-      value = "user_upload",
-      tags$div(
-        class = "user-upload-pane",
-        tags$section(
-          class = "upload-panel glass-card",
-          tags$div(
-            class = "upload-grid",
-            tags$div(
-              class = "upload-hero",
-              tags$div(
-                class = "upload-icon-wrap",
-                icon("cloud-upload", lib = "font-awesome")
-              ),
-              tags$div(
-                class = "upload-hero-copy",
-                tags$h3(class = "upload-title", "Bring your Seurat data"),
-                tags$p(
-                  class = "upload-hint",
-                  HTML("Drop a prepared <code>.rds</code> file, or browse to load a Seurat object for this session.")
-                ),
-                tags$div(
-                  class = "upload-guidelines",
-                  tags$span(class = "upload-pill", "Save as .rds"),
-                  tags$span(class = "upload-pill", "JoinLayers for v5"),
-                  tags$span(class = "upload-pill", "No PHI")
-                ),
-                tags$p(
-                  class = "upload-footnote",
-                  "Tip: For Seurat v5 objects, run JoinLayers() before saving."
-                )
-              )
-            ),
-            tags$div(
-              class = "upload-form",
-              tags$div(
-                class = "upload-dropzone",
-                fileInput(
-                  inputId = "user_seurat_file",
-                  label = NULL,
-                  buttonLabel = "Browse .rds",
-                  placeholder = "No file selected",
-                  accept = c(".rds")
-                )
-              ),
-              tags$div(
-                class = "upload-progress-area",
-                tags$div(
-                  class = "upload-progress-header",
-                  tags$div(
-                    class = "upload-progress-copy",
-                    tags$span(class = "upload-progress-label", "Upload status"),
-                    tags$p(
-                      id = "user-upload-status",
-                      class = "upload-progress-note",
-                      `data-default` = "Select an .rds file to begin.",
-                      "Select an .rds file to begin."
-                    )
-                  ),
-                  tags$div(
-                    class = "upload-progress-spinner",
-                    icon("circle-notch", class = "fa-spin"),
-                    tags$span(class = "sr-only", "Processing uploaded data")
-                  )
-                )
-              ),
-              tags$div(
-                class = "upload-feedback-area",
-                uiOutput("user_upload_feedback"),
-                uiOutput("user_dataset_summary")
-              )
-            )
-          )
-        )
-      )
-    ),
-    tabPanel(
-      title = HTML("CellInfo vs GeneExpr"),
-      value = "usr_cellinfo_gene",
-      uiOutput("usr_cellinfo_gene_panel")
-    ),
-    tabPanel(
-      title = HTML("CellInfo vs CellInfo"),
-      value = "usr_cellinfo_cellinfo",
-      uiOutput("usr_cellinfo_cellinfo_panel")
-    ),
-    tabPanel(
-      title = HTML("GeneExpr vs GeneExpr"),
-      value = "usr_gene_gene",
-      uiOutput("usr_gene_gene_panel")
-    ),
-    tabPanel(
-      title = HTML("Gene coexpression"),
-      value = "usr_gene_coexpression",
-      uiOutput("usr_gene_coexpression_panel")
-    ),
-    tabPanel(
-      title = HTML("Violinplot / Boxplot"),
-      value = "usr_violin_boxplot",
-      uiOutput("usr_violin_boxplot_panel")
-    ),
-    tabPanel(
-      title = HTML("Proportion plot"),
-      value = "usr_proportion_plot",
-      uiOutput("usr_proportion_plot_panel")
-    ),
-    tabPanel(
-      title = HTML("Bubbleplot / Heatmap"),
-      value = "usr_bubble_heatmap",
-      uiOutput("usr_bubble_heatmap_panel")
-    )
-  ),
+#   navbarMenu(
+#     "Developemental Testis",
+#     build_cellinfo_gene_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
+#     build_cellinfo_cellinfo_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
+#     build_gene_gene_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
+#     build_gene_coexpression_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
+#     build_violin_boxplot_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
+#     build_proportion_plot_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
+#     build_bubble_heatmap_tab("sc1", sc1conf, sc1def, "Developmental Testis")
+#   ),
+#   navbarMenu(
+#     "Developemental Sertolis",
+#     build_cellinfo_gene_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
+#     build_cellinfo_cellinfo_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
+#     build_gene_gene_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
+#     build_gene_coexpression_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
+#     build_violin_boxplot_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
+#     build_proportion_plot_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
+#     build_bubble_heatmap_tab("sc2", sc2conf, sc2def, "Developmental Sertolis")
+#   ),
+#   navbarMenu(
+#     "User Upload",
+#     tabPanel(
+#       "Upload",
+#       value = "user_upload",
+#       tags$div(
+#         class = "user-upload-pane",
+#         tags$section(
+#           class = "upload-panel glass-card",
+#           tags$div(
+#             class = "upload-grid",
+#             tags$div(
+#               class = "upload-hero",
+#               tags$div(
+#                 class = "upload-icon-wrap",
+#                 icon("cloud-upload", lib = "font-awesome")
+#               ),
+#               tags$div(
+#                 class = "upload-hero-copy",
+#                 tags$h3(class = "upload-title", "Bring your Seurat data"),
+#                 tags$p(
+#                   class = "upload-hint",
+#                   HTML("Drop a prepared <code>.rds</code> file, or browse to load a Seurat object for this session.")
+#                 ),
+#                 tags$div(
+#                   class = "upload-guidelines",
+#                   tags$span(class = "upload-pill", "Save as .rds"),
+#                   tags$span(class = "upload-pill", "JoinLayers for v5"),
+#                   tags$span(class = "upload-pill", "No PHI")
+#                 ),
+#                 tags$p(
+#                   class = "upload-footnote",
+#                   "Tip: For Seurat v5 objects, run JoinLayers() before saving."
+#                 )
+#               )
+#             ),
+#             tags$div(
+#               class = "upload-form",
+#               tags$div(
+#                 class = "upload-dropzone",
+#                 fileInput(
+#                   inputId = "user_seurat_file",
+#                   label = NULL,
+#                   buttonLabel = "Browse .rds",
+#                   placeholder = "No file selected",
+#                   accept = c(".rds")
+#                 )
+#               ),
+#               tags$div(
+#                 class = "upload-progress-area",
+#                 tags$div(
+#                   class = "upload-progress-header",
+#                   tags$div(
+#                     class = "upload-progress-copy",
+#                     tags$span(class = "upload-progress-label", "Upload status"),
+#                     tags$p(
+#                       id = "user-upload-status",
+#                       class = "upload-progress-note",
+#                       `data-default` = "Select an .rds file to begin.",
+#                       "Select an .rds file to begin."
+#                     )
+#                   ),
+#                   tags$div(
+#                     class = "upload-progress-spinner",
+#                     icon("circle-notch", class = "fa-spin"),
+#                     tags$span(class = "sr-only", "Processing uploaded data")
+#                   )
+#                 )
+#               ),
+#               tags$div(
+#                 class = "upload-feedback-area",
+#                 uiOutput("user_upload_feedback"),
+#                 uiOutput("user_dataset_summary")
+#               )
+#             )
+#           )
+#         )
+#       )
+#     ),
+#     tabPanel(
+#       title = HTML("CellInfo vs GeneExpr"),
+#       value = "usr_cellinfo_gene",
+#       uiOutput("usr_cellinfo_gene_panel")
+#     ),
+#     tabPanel(
+#       title = HTML("CellInfo vs CellInfo"),
+#       value = "usr_cellinfo_cellinfo",
+#       uiOutput("usr_cellinfo_cellinfo_panel")
+#     ),
+#     tabPanel(
+#       title = HTML("GeneExpr vs GeneExpr"),
+#       value = "usr_gene_gene",
+#       uiOutput("usr_gene_gene_panel")
+#     ),
+#     tabPanel(
+#       title = HTML("Gene coexpression"),
+#       value = "usr_gene_coexpression",
+#       uiOutput("usr_gene_coexpression_panel")
+#     ),
+#     tabPanel(
+#       title = HTML("Violinplot / Boxplot"),
+#       value = "usr_violin_boxplot",
+#       uiOutput("usr_violin_boxplot_panel")
+#     ),
+#     tabPanel(
+#       title = HTML("Proportion plot"),
+#       value = "usr_proportion_plot",
+#       uiOutput("usr_proportion_plot_panel")
+#     ),
+#     tabPanel(
+#       title = HTML("Bubbleplot / Heatmap"),
+#       value = "usr_bubble_heatmap",
+#       uiOutput("usr_bubble_heatmap_panel")
+#     )
+#   ),
 navbarMenu(
   "Interactive Data",
   
@@ -951,6 +1033,10 @@ navbarMenu(
           span("Lower expr"),
           div(class = "heat-gradient"),
           span("Higher expr")
+        ),
+        tags$p(
+          class = "heat-legend-note",
+          "Overlay numbers show the average expression of the searched gene for the cells in each tile (RNA data); higher values mean higher expression. Tiles below the threshold are unlabeled."
         )
       ),
       
@@ -1236,7 +1322,12 @@ navbarMenu(
 
    
 br(), 
-p(strong("Reference: "),"Hayden McSwiggen,","Single Nuclei Analysis of Staged Seminifierous Tubules,",em("Journal "),strong("###, "),"(2026) ","doi: DOI ",a("[Link]", href = "link", target="_blank"),style = "font-size: 125%;"), 
+p(
+  strong("Reference: "),
+  "Hayden McSwiggen, ",
+  "Single Nuclei Analysis of Staged Seminifierous Tubules (Unpublished, expected mid 2026)",
+  style = "font-size: 125%;"
+), 
 p(
   em("This webpage was made using "),
   a("ShinyCell", href = "https://github.com/SGDDNB/ShinyCell", target = "_blank"),
