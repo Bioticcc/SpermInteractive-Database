@@ -64,6 +64,7 @@ tags$head(
   
 tags$head(
   tags$link(rel = "stylesheet", type = "text/css", href = "style.css"),
+  tags$link(rel = "icon", type = "image/x-icon", href = "favicon.ico"),
   tags$script(src = "presets.js"),
   tags$script(HTML("
     function setNavVars() {
