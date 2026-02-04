@@ -16,7 +16,9 @@ if (interactive()) {
     install.packages("rsconnect")
   }
   rsconnect::setAccountInfo(name='ward-bio', token='NUH-UH', secret='ItsASecret :P')
-  rsconnect::deployApp(appDir = "/home/biotic/ShinyApp Project/ShinyApp/shinyApp", appName = "SpermInteractive")
+
+  #JUST RERUN THIS WHEN MAKING UPDATES
+  rsconnect::deployApp(appDir = "ShinyApp/shinyApp", appName = "SpermInteractive", forceUpdate = TRUE)
 }
 #--------------------------------------->
 

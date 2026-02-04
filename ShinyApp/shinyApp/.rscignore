@@ -1,0 +1,17 @@
+# rsconnect deployment ignore rules (applies only to shinyapps.io bundles)
+
+# Big raw Seurat objects (we deploy a slim, no-counts version instead)
+final_staged_object.rds
+final_staged_object_slim.rds
+final_staged_object_slim_nocounts.rds
+specificCellID*.rds
+
+# Disabled datasets for launch build
+sc1*
+sc2*
+
+# Local deployment metadata
+rsconnect/
+
+# Windows ADS artifacts
+*:Zone.Identifier

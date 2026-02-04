@@ -1065,6 +1065,11 @@ navbarMenu(
             color.background = "transparent",
             proxy.height = "720px"
           )
+        ),
+        tags$p(
+          class = "ra-sub",
+          HTML("Image Modified from M&auml;kel&auml; et. al. JoVE 2020, "),
+          a("https://dx.doi.org/10.3791/61800", href = "https://dx.doi.org/10.3791/61800", target = "_blank")
         )
       )
     )
@@ -1325,7 +1330,7 @@ navbarMenu(
 br(), 
 p(
   strong("Reference: "),
-  "Hayden McSwiggen, ",
+  "Hayden McSwiggin, ",
   "Single Nuclei Analysis of Staged Seminifierous Tubules (Unpublished, expected mid 2026)",
   style = "font-size: 125%;"
 ), 
