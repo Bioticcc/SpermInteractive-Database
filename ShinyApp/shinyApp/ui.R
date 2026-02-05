@@ -554,7 +554,7 @@ tags$div(
       )
     ),
     tags$p(class = "hdr-subtitle",
-           "A reactive database for the related datasets")
+           "An Interactive Dataset for Exploring Spermatogenesis")
   ),
   # Right: clickable logo button
   tags$div(
@@ -675,7 +675,69 @@ navbarPage(
 	            window.setTimeout(resizePlotlyActive, 900);
 	            window.setTimeout(resizePlotlyActive, 1800);
 	          }
+	          var suppressHistory = false;
+	          function getTabValueFromAnchor(anchor) {
+	            if (!anchor) return null;
+	            return anchor.getAttribute('data-value') ||
+	              anchor.getAttribute('data-tab-value') ||
+	              (anchor.getAttribute('data-bs-target') || '').replace('#','') ||
+	              (anchor.getAttribute('href') || '').replace('#','');
+	          }
+	          function selectTabByValue(val) {
+	            if (!val) return;
+	            if (val === 'retinoic_acid_line') { val = 'retinoic_acid'; }
+	            var selector = '#mainTabs a[data-toggle=\"tab\"][data-value=\"' + val + '\"], ' +
+	              '#mainTabs a[data-bs-toggle=\"tab\"][data-value=\"' + val + '\"], ' +
+	              '#mainTabs a[role=\"tab\"][data-value=\"' + val + '\"]';
+	            var link = document.querySelector(selector);
+	            if (!link) {
+	              selector = '#mainTabs a[href=\"#' + val + '\"]';
+	              link = document.querySelector(selector);
+	            }
+	            if (link) {
+	              suppressHistory = true;
+	              if (window.jQuery && window.jQuery.fn && window.jQuery.fn.tab) {
+	                window.jQuery(link).tab('show');
+	              } else {
+	                link.click();
+	              }
+	            }
+	          }
+	          function pushTabHistory(val, replace) {
+	            if (!val) return;
+	            if (window.history && window.history.replaceState && window.history.pushState) {
+	              var url = '#' + val;
+	              if (replace) {
+	                window.history.replaceState({tab: val}, '', url);
+	              } else {
+	                window.history.pushState({tab: val}, '', url);
+	              }
+	            } else {
+	              window.location.hash = val;
+	            }
+	          }
+	          window.addEventListener('popstate', function(evt) {
+	            var stateTab = evt && evt.state ? evt.state.tab : null;
+	            var hashTab = (window.location.hash || '').replace('#','');
+	            var target = stateTab || hashTab;
+	            if (target) {
+	              selectTabByValue(target);
+	            }
+	          });
+	          window.setTimeout(function() {
+	            var active = document.querySelector('#mainTabs li.active a');
+	            var activeVal = getTabValueFromAnchor(active);
+	            if (activeVal) {
+	              pushTabHistory(activeVal, true);
+	            }
+	          }, 0);
 	          $(document).on('shown.bs.tab', '#mainTabs a[data-toggle=\"tab\"], #mainTabs a[data-bs-toggle=\"tab\"], #mainTabs a[role=\"tab\"]', function() {
+	            var tabVal = getTabValueFromAnchor(this);
+	            if (suppressHistory) {
+	              suppressHistory = false;
+	            } else {
+	              pushTabHistory(tabVal, false);
+	            }
 	            window.setTimeout(function() { closeAllDropdowns('shown'); }, 160);
 	            schedulePlotlyResizes();
 	          });
@@ -721,9 +783,9 @@ navbarPage(
         width = 8,
         div(class = "home-card home-hero",
             h2("Welcome"),
-            p("This database allows you to explore single-cell datasets and generate publication-ready figures for download.", br(),
-              "Currently, the database includes the Staged Testis dataset, with more datasets to be added in the future,", br(), 
-              "such as developmental testis/sertolis subset.",br())
+            p("Explore gene expression throughout mouse spermatogenesis with an an intuitive, interactive interface. ",
+              "Query your genes of interest, visualize stage-specific expression patterns, and export publication-ready figures - no coding required! ",
+              "The current release features our staged testis atlas, with developmental time-course and spatial transcription datasets coming soon")
         )
       ),
       column(
@@ -755,6 +817,28 @@ navbarPage(
                   href = "#",
                   role = "button",
                   tabindex = "0",
+                  `data-target-tab` = "sc3_cellinfo_gene",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+                  div(
+                    class = "home-card",
+                    tags$img(
+                      src = "staged_testis_umap_preview.png",
+                      class = "home-card-preview",
+                      loading = "lazy",
+                      alt = "Preview of the staged testis UMAP embeddings"
+                    ),
+                    h4("Staged Testis UMAPS"),
+                    p("Visualise cell information and gene expression side-by-side on low-dimensional representations.")
+                  )
+                )
+              ),
+              column(
+                width = 3,
+                tags$a(
+                  class = "home-card-link",
+                  href = "#",
+                  role = "button",
+                  tabindex = "0",
                   `data-target-tab` = "spermatogonia_table",
                   onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
                   div(
@@ -763,9 +847,9 @@ navbarPage(
                       src = "interactiveTable.png",
                       class = "home-card-preview",
                       loading = "lazy",
-                      alt = "Preview of the spermatogonia interactive table"
+                      alt = "Preview of the spermatogenesis interactive table"
                     ),
-                    h4("Spermatogonia Interactive Table"),
+                    h4("Spermatogenesis Interactive Table"),
                     p("Navigate the stage-positioned table to open context-specific modals with curated gene lists and matched cell subsets.")
                   )
                 )
@@ -782,35 +866,13 @@ navbarPage(
                   div(
                     class = "home-card",
                     tags$img(
-                      src = "ra_dotplot_preview.png",
-                      class = "home-card-preview",
-                      loading = "lazy",
-                      alt = "Preview of the RA dot plot figure"
-                    ),
-                    h4("Retinoic Acid: DotPlot View"),
-                    p("Toggle RA gene panels, adjust cell selections, and export the dot plot that recreates Figure 5A.")
-                  )
-                )
-              ),
-              column(
-                width = 3,
-                tags$a(
-                  class = "home-card-link",
-                  href = "#",
-                  role = "button",
-                  tabindex = "0",
-                  `data-target-tab` = "retinoic_acid_line",
-                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
-                  div(
-                    class = "home-card",
-                    tags$img(
                       src = "ra_lineplot_preview.png",
                       class = "home-card-preview",
                       loading = "lazy",
                       alt = "Preview of the RA line plot figure"
                     ),
-                    h4("Retinoic Acid: LinePlot View"),
-                    p("Build multi-row RA gene trajectories to explore temporal expression trends inspired by Figure 5B.")
+                    h4("Retinoic Acid Analysis"),
+                    p("Explore RA gene expression across cell populations and developmental trajectories, recreating Figures 5A–B to your own specifications")
                   )
                 )
               ),
@@ -831,7 +893,7 @@ navbarPage(
                       loading = "lazy",
                       alt = "Preview of the cell-to-cell communication heatmap"
                     ),
-                    h4("Cell-to-Cell Heatmaps"),
+                    h4("Cell-Cell Communication Analysis"),
                     p("Visualize ligand–receptor communication scores across stages, select LR pairs, and download customized heatmaps.")
                   )
                 )
@@ -994,10 +1056,10 @@ navbarMenu(
   "Interactive Data",
   
   # =========================
-  # SPERMATOGONIA TABLE (PNG only)
+  # SPERMATOGENESIS TABLE (PNG only)
   # =========================
   tabPanel(
-    "Spermatogonia Table",
+    "Spermatogenesis Table",
     value = "spermatogonia_table",
     tags$div(
       class = "ra-pane",
@@ -1009,7 +1071,7 @@ navbarMenu(
         style = "align-self: flex-start;",
         tags$div(
           class = "ra-card-head",
-          tags$h3(class = "ra-title", "Spermatogonia Controls"),
+          tags$h3(class = "ra-title", "Spermatogenesis Controls"),
           tags$p(class = "ra-sub", "Optional filters for highlighting/querying genes.")
         ),
         tags$div(
@@ -1050,7 +1112,7 @@ navbarMenu(
         # Card header
         tags$div(
           class = "ra-card-head",
-          tags$h3(class = "ra-title", "Interactive Spermatogonia Table"),
+          tags$h3(class = "ra-title", "Interactive Spermatogenesis Table"),
           tags$p(class = "ra-sub", "Click a cell to view matched cells in the dataset.")
         ),
         
@@ -1075,11 +1137,11 @@ navbarMenu(
     )
   ),
   
-  # ========================================
-  # RA DOTPLOT (PNG + vector PDF via server)
-  # ========================================
+  # ==========================================
+  # RETINOIC ACID SIGNALING PLOTS (COMBINED)
+  # ==========================================
   tabPanel(
-    "Retinoic Acid Signaling (DotPlot View)",
+    "Retinoic Acid Analysis",
     value = "retinoic_acid",
     tags$div(
       class = "ra-pane",
@@ -1161,15 +1223,10 @@ navbarMenu(
           )
         )
       )
-    )
-  ),
-  
-  # =========================================
-  # RA LINEPLOT (PNG + vector PDF via server)
-  # =========================================
-  tabPanel(
-    "Retinoic Acid Signaling (LinePlot View)",
-    value = "retinoic_acid_line",
+    ),
+
+    tags$hr(class = "ra-divider"),
+
     tags$div(
       class = "ra-pane",
       

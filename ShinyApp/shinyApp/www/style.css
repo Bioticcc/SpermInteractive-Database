@@ -2214,6 +2214,13 @@ h2, h3, h4     { font-weight: 600; letter-spacing: 0.25px; }
   align-items: start;
 }
 
+.ra-divider{
+  border: 0;
+  border-top: 1px solid var(--color-control-border);
+  margin: 26px 0 22px;
+  opacity: 0.9;
+}
+
 /* sticky controls so it tracks with scroll a bit */
 .ra-controls{ position: sticky; top: 16px; }
 

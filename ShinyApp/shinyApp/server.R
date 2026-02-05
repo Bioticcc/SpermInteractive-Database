@@ -242,7 +242,7 @@ get_gene_index <- function(inpGene, gene_name) {
 
 active_button <- reactiveVal(NULL)
 
-ra_tab_ids <- c("spermatogonia_table", "retinoic_acid", "retinoic_acid_line")
+ra_tab_ids <- c("spermatogonia_table", "retinoic_acid")
 
 
 ### Useful stuff 
@@ -314,6 +314,12 @@ sctheme <- function(base_size = 24, XYval = TRUE, Xang = 0, XjusH = 0.5, dark = 
 } 
  
 ### Common plotting functions 
+# Detect when a DR plot is using the UMAP embedding
+is_umap_view <- function(inpConf, inpdrX, inpdrY) {
+  dr_ids <- inpConf[UI %in% c(inpdrX, inpdrY)]$ID
+  length(dr_ids) == 2 && setequal(dr_ids, c("UMAP_1", "UMAP_2"))
+}
+
 # Plot cell information on dimred 
 scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2, 
                      inpsiz, inpcol, inpord, inpfsz, inpasp, inptxt, inplab,
@@ -324,6 +330,15 @@ scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
                        inpConf[UI == inp1]$ID, inpConf[UI == inpsub1]$ID),  
                    with = FALSE] 
   colnames(ggData) = c("X", "Y", "val", "sub") 
+  stage_split <- FALSE
+  if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
+    stage_split <- TRUE
+    stage_vals <- inpMeta[["sample"]]
+    if (!is.factor(stage_vals)) {
+      stage_vals <- factor(stage_vals)
+    }
+    ggData$stage <- stage_vals
+  }
   rat = (max(ggData$X) - min(ggData$X)) / (max(ggData$Y) - min(ggData$Y)) 
   bgCells = FALSE 
   if(length(inpsub2) != 0 & length(inpsub2) != nlevels(ggData$sub)){ 
@@ -369,7 +384,11 @@ scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
                                   nrow = inpConf[UI == inp1]$fRow)) + 
       theme(legend.text = element_text(size = sListX[inpfsz])) 
     if(inplab){ 
-      ggData3 = ggData[, .(X = mean(X), Y = mean(Y)), by = "val"] 
+      if (stage_split) {
+        ggData3 = ggData[, .(X = mean(X), Y = mean(Y)), by = c("stage", "val")]
+      } else {
+        ggData3 = ggData[, .(X = mean(X), Y = mean(Y)), by = "val"]
+      }
       lListX = min(nchar(paste0(ggData3$val, collapse = "")), 200) 
       lListX = lList - (0.25 * floor(lListX/50)) 
       label_text_col <- if (dark_theme) "#f8fafc" else "grey10"
@@ -385,6 +404,9 @@ scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
   } else if(inpasp == "Fixed") { 
     ggOut = ggOut + coord_fixed() 
   } 
+  if (stage_split) {
+    ggOut = ggOut + facet_wrap(~stage, ncol = 2)
+  }
   return(ggOut) 
 } 
  
@@ -433,6 +455,15 @@ scDRgene <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
                        inpConf[UI == inpsub1]$ID),  
                    with = FALSE] 
   colnames(ggData) = c("X", "Y", "sub") 
+  stage_split <- FALSE
+  if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
+    stage_split <- TRUE
+    stage_vals <- inpMeta[["sample"]]
+    if (!is.factor(stage_vals)) {
+      stage_vals <- factor(stage_vals)
+    }
+    ggData$stage <- stage_vals
+  }
   rat = (max(ggData$X) - min(ggData$X)) / (max(ggData$Y) - min(ggData$Y)) 
  
   gene_idx <- get_gene_index(inpGene, inp1)
@@ -469,6 +500,9 @@ scDRgene <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
   } else if(inpasp == "Fixed") { 
     ggOut = ggOut + coord_fixed() 
   } 
+  if (stage_split) {
+    ggOut = ggOut + facet_wrap(~stage, ncol = 2)
+  }
   return(ggOut) 
 } 
  
@@ -488,6 +522,15 @@ scDRcoex <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inp2,
                        inpConf[UI == inpsub1]$ID),  
                    with = FALSE] 
   colnames(ggData) = c("X", "Y", "sub") 
+  stage_split <- FALSE
+  if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
+    stage_split <- TRUE
+    stage_vals <- inpMeta[["sample"]]
+    if (!is.factor(stage_vals)) {
+      stage_vals <- factor(stage_vals)
+    }
+    ggData$stage <- stage_vals
+  }
   rat = (max(ggData$X) - min(ggData$X)) / (max(ggData$Y) - min(ggData$Y)) 
  
   gene_idx1 <- get_gene_index(inpGene, inp1)
@@ -559,6 +602,9 @@ scDRcoex <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inp2,
   } else if(inpasp == "Fixed") { 
     ggOut = ggOut + coord_fixed() 
   } 
+  if (stage_split) {
+    ggOut = ggOut + facet_wrap(~stage, ncol = 2)
+  }
   return(ggOut) 
 } 
  
@@ -815,7 +861,12 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
                             limits = c(0, 1), breaks = c(0.00,0.25,0.50,0.75,1.00)) + 
       scale_color_gradientn("expression", limits = colRange, colours = cList[[inpcols]]) + 
       guides(color = guide_colorbar(barwidth = 15)) + 
-      theme(axis.title = element_blank(), legend.box = "vertical") 
+      theme(
+        axis.title = element_blank(),
+        legend.box = "vertical",
+        axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1),
+        plot.margin = grid::unit(c(0.5, 0.5, 1.2, 0.5), "lines")
+      ) 
   } else { 
     # Heatmap 
     ggOut = ggplot(ggData, aes(grpBy, geneName, fill = val)) + 
@@ -825,7 +876,11 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
       scale_y_discrete(expand = c(0, 0.5)) + 
       scale_fill_gradientn("expression", limits = colRange, colours = cList[[inpcols]]) + 
       guides(fill = guide_colorbar(barwidth = 15)) + 
-      theme(axis.title = element_blank()) 
+      theme(
+        axis.title = element_blank(),
+        axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1),
+        plot.margin = grid::unit(c(0.5, 0.5, 1.2, 0.5), "lines")
+      ) 
   } 
      
   # Final tidy 
@@ -972,7 +1027,7 @@ shinyServer(function(input, output, session) {
       return(TRUE)
     }
     if (isTRUE(show_progress)) {
-      withProgress(message = "Loading spermatogonia table data…", value = 0, {
+      withProgress(message = "Loading spermatogenesis table data…", value = 0, {
         get_spg_avg_expr()
         incProgress(1)
       })
@@ -1029,9 +1084,8 @@ shinyServer(function(input, output, session) {
         open_ra_gate("spermatogonia")
       } else if (identical(tab, "retinoic_acid")) {
         ensure_dot_assets()
-        open_ra_gate("ra_dotplot")
-      } else if (identical(tab, "retinoic_acid_line")) {
         ensure_line_assets()
+        open_ra_gate("ra_dotplot")
         open_ra_gate("ra_lineplot")
       }
     }
@@ -3830,7 +3884,7 @@ shinyServer(function(input, output, session) {
   
   #------------------------------------------------->
   # Monitor for modal closure and remove highlight
-  # ==== Spermatogonia SVG layout (uses your old UI constants) ====
+  # ==== Spermatogenesis SVG layout (uses your old UI constants) ====
   make_layout <- function() {
     # Constants that matched your old absolute buttons (900px-wide rendering)
     origin_x <- 37
@@ -4005,7 +4059,8 @@ shinyServer(function(input, output, session) {
       tags$div(
         class = "spg-modal-summary",
         tags$b("Top Gene:"), " ", top_gene, tags$br(),
-        tags$b("Total Genes Above Threshold:"), " ", length(filtered_expr)
+        tags$b("Total Genes Above Threshold:"), " ", length(filtered_expr), tags$br(),
+        tags$b("Expression Threshold:"), " > ", formatC(EXPR_THRESHOLD, format = "f", digits = 3), " (log-normalized RNA)"
       ),
       tags$div(
         class = "spg-modal-search-block",
@@ -4226,10 +4281,10 @@ shinyServer(function(input, output, session) {
 
     p <- ggplot(df, aes(x = features, y = id)) +
       geom_point(
-        aes(size = pct.exp, color = avg.exp.scaled),
-        shape = 21, stroke = 0.3, fill = NA, colour = point_stroke
+        aes(size = pct.exp, fill = avg.exp.scaled),
+        shape = 21, stroke = 0.3, color = point_stroke
       ) +
-      scale_color_gradientn(
+      scale_fill_gradientn(
         colors = themed_bvt,
         values = scales::rescale(c(-2.5, 0, 2.5)),
         limits = c(-2.5, 2.5),
@@ -4256,7 +4311,7 @@ shinyServer(function(input, output, session) {
       ) +
       labs(title = NULL) +
       guides(
-        color = guide_colorbar(title = "Average Expression"),
+        fill = guide_colorbar(title = "Average Expression"),
         size  = guide_legend(title = "Percent Expressed")
       ) +
       coord_flip()

@@ -110,7 +110,7 @@ for (i in seq_along(combo_levels)) {
 
 saveRDS(line_arr, file.path(out_dir, "ra_line_mean_expr.rds"))
 
-# ---- Spermatogonia table assets (avg by button mapping) ----
+# ---- Spermatogenesis table assets (avg by button mapping) ----
 message("Computing spermatogonia table summaries...")
 mapping_path <- file.path(out_dir, "button_mapping_general.R")
 if (!file.exists(mapping_path)) {
