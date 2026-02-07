@@ -1805,6 +1805,15 @@ html[data-theme='dark'] .container-fluid .tab-content{
   font-weight: 500;
 }
 
+.hdr-version{
+  margin: 0;
+  font-size: calc(var(--hdr-subtitle) * 0.85);
+  color: var(--hdr-fg-sub);
+  opacity: 0.9;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
 /* right: logo button */
 .hdr-logo{
   flex: 0 0 auto;
@@ -2583,6 +2592,45 @@ html[data-theme='dark'] .ra-sub{
   align-items: start;
 }
 
+.mainfig-pane{
+  /* Match the control column height to the plot column and keep the two cards aligned. */
+  align-items: stretch;
+  /* Slightly wider control column so long cell names don't overflow the card. */
+  grid-template-columns: minmax(320px, 380px) 1fr;
+}
+
+.mainfig-controls{
+  overflow: auto;
+}
+
+.mainfig-controls .checkbox label{
+  /* Shiny renders checkbox labels inside a flex row; allow long labels to wrap. */
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.mainfig-plot-holder{
+  /* The square plot sets its own height via aspect-ratio. */
+  --plot-min-height: 0px;
+}
+
+.mainfig-square{
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.mainfig-square .shiny-plot-output{
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mainfig-square .shiny-plot-output > img{
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .legacy-stack{
   display: flex;
   flex-direction: column;
@@ -2864,6 +2912,41 @@ html[data-theme='dark'] .ra-plot-holder{
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+.home-icon-grid{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch; /* equal-height columns */
+}
+
+.home-icon-grid > [class*='col-']{
+  display: flex;
+  flex-direction: column;
+}
+
+.home-icon-grid .home-card-link{
+  display: flex;
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+.home-icon-grid .home-card-link .home-card{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.home-icon-grid .home-card-preview{
+  height: 140px; /* keep preview heights consistent so text aligns */
+}
+
+.home-icon-grid .home-card h4{
+  line-height: 1.2;
+  min-height: 2.4em; /* reserve space for up to ~2 lines so subtext starts aligned */
+  margin: 0 0 8px 0;
+}
+
 .home-card-link:focus-visible .home-card {
   outline: 3px solid #4F46E5;
   outline-offset: 4px;
@@ -3016,6 +3099,23 @@ html[data-theme='dark'] .theme-card{
 .home-card.home-hero p {
   font-size: 1rem;  /* adjust as needed */
   line-height: 1.7;
+}
+
+.tutorial-btn-wrap{
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.tutorial-btn{
+  opacity: 0.88;
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.tutorial-btn:hover,
+.tutorial-btn:focus-visible{
+  opacity: 1;
+  transform: translateY(-1px);
 }
 
 /* Optional: tighter list spacing */

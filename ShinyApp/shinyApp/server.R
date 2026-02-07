@@ -196,6 +196,26 @@ make_lazy_data("sc3def",  "sc3def.rds")
 make_lazy_data("sc3gene", "sc3gene.rds", normalize_gene_index)
 make_lazy_data("sc3meta", "sc3meta.rds")
 
+make_lazy_data("sc4conf", "sc4conf.rds")
+make_lazy_data("sc4def",  "sc4def.rds")
+make_lazy_data("sc4gene", "sc4gene.rds", normalize_gene_index)
+make_lazy_data("sc4meta", "sc4meta.rds")
+
+make_lazy_data("sc5conf", "sc5conf.rds")
+make_lazy_data("sc5def",  "sc5def.rds")
+make_lazy_data("sc5gene", "sc5gene.rds", normalize_gene_index)
+make_lazy_data("sc5meta", "sc5meta.rds")
+
+make_lazy_data("sc6conf", "sc6conf.rds")
+make_lazy_data("sc6def",  "sc6def.rds")
+make_lazy_data("sc6gene", "sc6gene.rds", normalize_gene_index)
+make_lazy_data("sc6meta", "sc6meta.rds")
+
+make_lazy_data("sc7conf", "sc7conf.rds")
+make_lazy_data("sc7def",  "sc7def.rds")
+make_lazy_data("sc7gene", "sc7gene.rds", normalize_gene_index)
+make_lazy_data("sc7meta", "sc7meta.rds")
+
 h5_dataset_reader <- local({
   cache <- new.env(parent = emptyenv())
   function(path, cache_ok = TRUE) {
@@ -317,22 +337,31 @@ sctheme <- function(base_size = 24, XYval = TRUE, Xang = 0, XjusH = 0.5, dark = 
 # Detect when a DR plot is using the UMAP embedding
 is_umap_view <- function(inpConf, inpdrX, inpdrY) {
   dr_ids <- inpConf[UI %in% c(inpdrX, inpdrY)]$ID
-  length(dr_ids) == 2 && setequal(dr_ids, c("UMAP_1", "UMAP_2"))
+  dr_ids <- tolower(dr_ids)
+  length(dr_ids) == 2 && setequal(dr_ids, c("umap_1", "umap_2"))
 }
 
 # Plot cell information on dimred 
 scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2, 
                      inpsiz, inpcol, inpord, inpfsz, inpasp, inptxt, inplab,
-                     dark_theme = FALSE){ 
+                     dark_theme = FALSE,
+                     stage_split = NULL,
+                     stage_facet_ncol = 2){ 
   if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inpdrX]$ID, inpConf[UI == inpdrY]$ID, 
                        inpConf[UI == inp1]$ID, inpConf[UI == inpsub1]$ID),  
                    with = FALSE] 
   colnames(ggData) = c("X", "Y", "val", "sub") 
-  stage_split <- FALSE
-  if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
-    stage_split <- TRUE
+  stage_split_active <- FALSE
+  if (isTRUE(stage_split)) {
+    stage_split_active <- TRUE
+  } else if (isFALSE(stage_split)) {
+    stage_split_active <- FALSE
+  } else if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
+    stage_split_active <- TRUE
+  }
+  if (stage_split_active) {
     stage_vals <- inpMeta[["sample"]]
     if (!is.factor(stage_vals)) {
       stage_vals <- factor(stage_vals)
@@ -384,7 +413,7 @@ scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
                                   nrow = inpConf[UI == inp1]$fRow)) + 
       theme(legend.text = element_text(size = sListX[inpfsz])) 
     if(inplab){ 
-      if (stage_split) {
+      if (stage_split_active) {
         ggData3 = ggData[, .(X = mean(X), Y = mean(Y)), by = c("stage", "val")]
       } else {
         ggData3 = ggData[, .(X = mean(X), Y = mean(Y)), by = "val"]
@@ -404,8 +433,12 @@ scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
   } else if(inpasp == "Fixed") { 
     ggOut = ggOut + coord_fixed() 
   } 
-  if (stage_split) {
-    ggOut = ggOut + facet_wrap(~stage, ncol = 2)
+  if (stage_split_active) {
+    ncol <- suppressWarnings(as.integer(stage_facet_ncol))
+    if (is.na(ncol) || ncol < 1) {
+      ncol <- 2
+    }
+    ggOut = ggOut + facet_wrap(~stage, ncol = ncol)
   }
   return(ggOut) 
 } 
@@ -448,16 +481,23 @@ scDRnum <- function(inpConf, inpMeta, inp1, inp2, inpsub1, inpsub2,
 scDRgene <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2, 
                      inpH5, inpGene, 
                      inpsiz, inpcol, inpord, inpfsz, inpasp, inptxt,
-                     dark_theme = FALSE){ 
+                     dark_theme = FALSE,
+                     stage_split = NULL){ 
   if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inpdrX]$ID, inpConf[UI == inpdrY]$ID, 
                        inpConf[UI == inpsub1]$ID),  
                    with = FALSE] 
   colnames(ggData) = c("X", "Y", "sub") 
-  stage_split <- FALSE
-  if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
-    stage_split <- TRUE
+  stage_split_active <- FALSE
+  if (isTRUE(stage_split)) {
+    stage_split_active <- TRUE
+  } else if (isFALSE(stage_split)) {
+    stage_split_active <- FALSE
+  } else if ("sample" %in% names(inpMeta) && is_umap_view(inpConf, inpdrX, inpdrY)) {
+    stage_split_active <- TRUE
+  }
+  if (stage_split_active) {
     stage_vals <- inpMeta[["sample"]]
     if (!is.factor(stage_vals)) {
       stage_vals <- factor(stage_vals)
@@ -500,7 +540,7 @@ scDRgene <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
   } else if(inpasp == "Fixed") { 
     ggOut = ggOut + coord_fixed() 
   } 
-  if (stage_split) {
+  if (stage_split_active) {
     ggOut = ggOut + facet_wrap(~stage, ncol = 2)
   }
   return(ggOut) 
@@ -1121,7 +1161,11 @@ shinyServer(function(input, output, session) {
   preset_select_inputs <- c(
 #     "sc1a1drX","sc1a1drY","sc1a1inp1","sc1a1inp2",
 #     "sc2a1drX","sc2a1drY","sc2a1inp1","sc2a1inp2",
-    "sc3a1drX","sc3a1drY","sc3a1inp1","sc3a1inp2"
+    "sc3a1drX","sc3a1drY","sc3a1inp1","sc3a1inp2",
+    "sc4a1drX","sc4a1drY","sc4a1inp1","sc4a1inp2",
+    "sc5a1drX","sc5a1drY","sc5a1inp1","sc5a1inp2",
+    "sc6a1drX","sc6a1drY","sc6a1inp1","sc6a1inp2",
+    "sc7a1drX","sc7a1drY","sc7a1inp1","sc7a1inp2"
   )
   preset_multi_inputs <- c("ra_genes", "ra_cell_types")
   encode_query_value <- function(value) paste(value, collapse = ",")
@@ -2226,12 +2270,1236 @@ shinyServer(function(input, output, session) {
 #   input$usrd1scl, input$usrd1row, input$usrd1col, 
 #   input$usrd1cols, input$usrd1fsz, dark_theme = dark_theme) ) 
 #   }) 
-    observeEvent(input$home_card_nav, {
+  observeEvent(input$home_card_nav, {
     # allow home hero cards to jump directly to their target tabs
     req(input$home_card_nav)
     updateNavbarPage(session, "mainTabs", selected = input$home_card_nav)
     session$sendCustomMessage("close-nav-dropdown", list(target = input$home_card_nav, delay = 280))
   })
+  observeEvent(input$open_tutorial, {
+    # open a blank placeholder page in-app without adding to navbar
+    showModal(modalDialog(
+      title = "Extended Tutorial (coming soon)",
+      "A full walkthrough will appear here in a future update.",
+      easyClose = TRUE,
+      footer = modalButton("Close")
+    ))
+  })
+
+  bind_main_figures <- function(prefix, get_conf, get_meta) {
+    make_id <- function(part) paste0(prefix, "mf", part)
+    target_ui <- "specificCellID.1"
+
+    get_groups <- function() {
+      conf <- get_conf()
+      vals <- conf[UI == target_ui]$fID
+      vals <- if (length(vals) && !is.na(vals[[1]])) vals[[1]] else ""
+      if (!nzchar(vals)) {
+        return(character(0))
+      }
+      strsplit(vals, "\\|")[[1]]
+    }
+
+    observeEvent(input[[make_id("none")]], {
+      sub <- get_groups()
+      updateCheckboxGroupInput(
+        session,
+        inputId = make_id("cells"),
+        label = NULL,
+        choices = sub,
+        selected = NULL,
+        inline = FALSE
+      )
+    })
+
+    observeEvent(input[[make_id("all")]], {
+      sub <- get_groups()
+      updateCheckboxGroupInput(
+        session,
+        inputId = make_id("cells"),
+        label = NULL,
+        choices = sub,
+        selected = sub,
+        inline = FALSE
+      )
+    })
+
+    output[[make_id("main")]] <- renderPlot({
+      pt_size <- input[[make_id("pt")]]
+      if (is.null(pt_size) || !is.finite(pt_size)) {
+        pt_size <- 2.5
+      }
+      with_dark(
+        scDRcell,
+        get_conf(),
+        get_meta(),
+        "UMAP1",
+        "UMAP2",
+        target_ui,
+        target_ui,
+        input[[make_id("cells")]],
+        pt_size,              # point size
+        "Blue-Yellow-Red",   # ignored for categorical
+        "Original",
+        "Medium",
+        "Square",
+        FALSE,               # show axis text
+        TRUE,                # show labels
+        stage_split = FALSE
+      )
+    })
+    outputOptions(output, make_id("main"), suspendWhenHidden = TRUE)
+
+    output[[make_id("split")]] <- renderPlot({
+      p <- with_dark(
+        scDRcell,
+        get_conf(),
+        get_meta(),
+        "UMAP1",
+        "UMAP2",
+        target_ui,
+        target_ui,
+        input[[make_id("cells")]],
+        0.9,                 # point size
+        "Blue-Yellow-Red",
+        "Original",
+        "Small",
+        "Square",
+        FALSE,
+        TRUE,
+        stage_split = TRUE,
+        stage_facet_ncol = 4
+      )
+      # Bottom row should show only the panels (no color legend) to avoid crowding.
+      p + ggplot2::theme(legend.position = "none") +
+        ggplot2::guides(color = "none", fill = "none")
+    })
+    outputOptions(output, make_id("split"), suspendWhenHidden = TRUE)
+  }
+
+  bind_shinycell_dataset <- function(prefix,
+                                     get_conf,
+                                     get_meta,
+                                     get_def,
+                                     get_gene,
+                                     gexpr_path) {
+    make_id <- function(part) paste0(prefix, part)
+
+    optCrt_local <- "{ option_create: function(data,escape) {return('<div class=\\\"create\\\"><strong>' + '</strong></div>');} }"
+
+    # Server-side selectize inputs (genes + numeric cell info).
+    observe({
+      genes <- get_gene()
+      conf <- get_conf()
+      def <- get_def()
+      req(!is.null(genes), length(genes) > 0, !is.null(names(genes)))
+
+      updateSelectizeInput(
+        session,
+        make_id("a1inp2"),
+        choices = names(genes),
+        server = TRUE,
+        selected = def$gene1,
+        options = list(maxOptions = 7, create = TRUE, persist = TRUE, render = I(optCrt_local))
+      )
+      updateSelectizeInput(
+        session,
+        make_id("a3inp1"),
+        choices = names(genes),
+        server = TRUE,
+        selected = def$gene1,
+        options = list(maxOptions = 7, create = TRUE, persist = TRUE, render = I(optCrt_local))
+      )
+      updateSelectizeInput(
+        session,
+        make_id("a3inp2"),
+        choices = names(genes),
+        server = TRUE,
+        selected = def$gene2,
+        options = list(maxOptions = 7, create = TRUE, persist = TRUE, render = I(optCrt_local))
+      )
+      updateSelectizeInput(
+        session,
+        make_id("b2inp1"),
+        choices = names(genes),
+        server = TRUE,
+        selected = def$gene1,
+        options = list(maxOptions = 7, create = TRUE, persist = TRUE, render = I(optCrt_local))
+      )
+      updateSelectizeInput(
+        session,
+        make_id("b2inp2"),
+        choices = names(genes),
+        server = TRUE,
+        selected = def$gene2,
+        options = list(maxOptions = 7, create = TRUE, persist = TRUE, render = I(optCrt_local))
+      )
+
+      numeric_meta <- conf[is.na(fID)]$UI
+      if (!length(numeric_meta)) {
+        numeric_meta <- character(0)
+      }
+      selected_y <- numeric_meta[[1]]
+      if (is.null(selected_y) || is.na(selected_y) || !nzchar(selected_y)) {
+        selected_y <- def$gene1
+      }
+      updateSelectizeInput(
+        session,
+        make_id("c1inp2"),
+        server = TRUE,
+        choices = c(numeric_meta, names(genes)),
+        selected = selected_y,
+        options = list(
+          maxOptions = length(numeric_meta) + 3,
+          create = TRUE,
+          persist = TRUE,
+          render = I(optCrt_local)
+        )
+      )
+    })
+
+    # ---- Helpers: subset checkbox UI + buttons ----
+    bind_subset_controls <- function(block) {
+      output[[make_id(paste0(block, "sub1.ui"))]] <- renderUI({
+        conf <- get_conf()
+        selected <- input[[make_id(paste0(block, "sub1"))]]
+        sub <- strsplit(conf[UI == selected]$fID, "\\|")[[1]]
+        checkboxGroupInput(
+          make_id(paste0(block, "sub2")),
+          "Select which cells to show",
+          inline = TRUE,
+          choices = sub,
+          selected = sub
+        )
+      })
+
+      observeEvent(input[[make_id(paste0(block, "sub1non"))]], {
+        conf <- get_conf()
+        selected <- input[[make_id(paste0(block, "sub1"))]]
+        sub <- strsplit(conf[UI == selected]$fID, "\\|")[[1]]
+        updateCheckboxGroupInput(
+          session,
+          inputId = make_id(paste0(block, "sub2")),
+          label = "Select which cells to show",
+          choices = sub,
+          selected = NULL,
+          inline = TRUE
+        )
+      })
+
+      observeEvent(input[[make_id(paste0(block, "sub1all"))]], {
+        conf <- get_conf()
+        selected <- input[[make_id(paste0(block, "sub1"))]]
+        sub <- strsplit(conf[UI == selected]$fID, "\\|")[[1]]
+        updateCheckboxGroupInput(
+          session,
+          inputId = make_id(paste0(block, "sub2")),
+          label = "Select which cells to show",
+          choices = sub,
+          selected = sub,
+          inline = TRUE
+        )
+      })
+    }
+
+    bind_subset_controls("a1")
+    bind_subset_controls("a2")
+    bind_subset_controls("a3")
+    bind_subset_controls("b2")
+    bind_subset_controls("c1")
+    bind_subset_controls("c2")
+    bind_subset_controls("d1")
+
+    # ---- Tab a1: CellInfo vs GeneExpr ----
+    output[[make_id("a1oup1")]] <- renderPlot({
+      with_dark(
+        scDRcell,
+        get_conf(),
+        get_meta(),
+        input[[make_id("a1drX")]],
+        input[[make_id("a1drY")]],
+        input[[make_id("a1inp1")]],
+        input[[make_id("a1sub1")]],
+        input[[make_id("a1sub2")]],
+        input[[make_id("a1siz")]],
+        input[[make_id("a1col1")]],
+        input[[make_id("a1ord1")]],
+        input[[make_id("a1fsz")]],
+        input[[make_id("a1asp")]],
+        input[[make_id("a1txt")]],
+        input[[make_id("a1lab1")]],
+        stage_split = input[[make_id("a1split")]]
+      )
+    })
+    output[[make_id("a1oup1.ui")]] <- renderUI({
+      plotOutput(make_id("a1oup1"), height = pList[input[[make_id("a1psz")]]])
+    })
+    output[[make_id("a1oup1.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a1drX")]], "_", input[[make_id("a1drY")]], "_", input[[make_id("a1inp1")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("a1oup1.h")]],
+          width = input[[make_id("a1oup1.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRcell,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a1drX")]],
+            input[[make_id("a1drY")]],
+            input[[make_id("a1inp1")]],
+            input[[make_id("a1sub1")]],
+            input[[make_id("a1sub2")]],
+            input[[make_id("a1siz")]],
+            input[[make_id("a1col1")]],
+            input[[make_id("a1ord1")]],
+            input[[make_id("a1fsz")]],
+            input[[make_id("a1asp")]],
+            input[[make_id("a1txt")]],
+            input[[make_id("a1lab1")]],
+            stage_split = input[[make_id("a1split")]]
+          )
+        )
+      }
+    )
+    output[[make_id("a1oup1.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a1drX")]], "_", input[[make_id("a1drY")]], "_", input[[make_id("a1inp1")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("a1oup1.h")]],
+          width = input[[make_id("a1oup1.w")]],
+          plot = with_dark_static(
+            scDRcell,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a1drX")]],
+            input[[make_id("a1drY")]],
+            input[[make_id("a1inp1")]],
+            input[[make_id("a1sub1")]],
+            input[[make_id("a1sub2")]],
+            input[[make_id("a1siz")]],
+            input[[make_id("a1col1")]],
+            input[[make_id("a1ord1")]],
+            input[[make_id("a1fsz")]],
+            input[[make_id("a1asp")]],
+            input[[make_id("a1txt")]],
+            input[[make_id("a1lab1")]],
+            stage_split = input[[make_id("a1split")]]
+          )
+        )
+      }
+    )
+
+    output[[make_id("a1.dt")]] <- renderDataTable({
+      ggData <- scDRnum(
+        get_conf(),
+        get_meta(),
+        input[[make_id("a1inp1")]],
+        input[[make_id("a1inp2")]],
+        input[[make_id("a1sub1")]],
+        input[[make_id("a1sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("a1splt")]]
+      )
+      datatable(
+        ggData,
+        rownames = FALSE,
+        extensions = "Buttons",
+        server = TRUE,
+        options = list(
+          pageLength = 50,
+          lengthMenu = c(25, 50, 100),
+          deferRender = TRUE,
+          dom = "tBfrtip",
+          buttons = c("copy", "csv", "excel")
+        )
+      ) %>% formatRound(columns = c("pctExpress"), digits = 2)
+    })
+
+    output[[make_id("a1oup2")]] <- renderPlot({
+      with_dark(
+        scDRgene,
+        get_conf(),
+        get_meta(),
+        input[[make_id("a1drX")]],
+        input[[make_id("a1drY")]],
+        input[[make_id("a1inp2")]],
+        input[[make_id("a1sub1")]],
+        input[[make_id("a1sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("a1siz")]],
+        input[[make_id("a1col2")]],
+        input[[make_id("a1ord2")]],
+        input[[make_id("a1fsz")]],
+        input[[make_id("a1asp")]],
+        input[[make_id("a1txt")]],
+        stage_split = input[[make_id("a1split")]]
+      )
+    })
+    output[[make_id("a1oup2.ui")]] <- renderUI({
+      plotOutput(make_id("a1oup2"), height = pList[input[[make_id("a1psz")]]])
+    })
+    output[[make_id("a1oup2.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a1drX")]], "_", input[[make_id("a1drY")]], "_", input[[make_id("a1inp2")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("a1oup2.h")]],
+          width = input[[make_id("a1oup2.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a1drX")]],
+            input[[make_id("a1drY")]],
+            input[[make_id("a1inp2")]],
+            input[[make_id("a1sub1")]],
+            input[[make_id("a1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a1siz")]],
+            input[[make_id("a1col2")]],
+            input[[make_id("a1ord2")]],
+            input[[make_id("a1fsz")]],
+            input[[make_id("a1asp")]],
+            input[[make_id("a1txt")]],
+            stage_split = input[[make_id("a1split")]]
+          )
+        )
+      }
+    )
+    output[[make_id("a1oup2.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a1drX")]], "_", input[[make_id("a1drY")]], "_", input[[make_id("a1inp2")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("a1oup2.h")]],
+          width = input[[make_id("a1oup2.w")]],
+          plot = with_dark_static(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a1drX")]],
+            input[[make_id("a1drY")]],
+            input[[make_id("a1inp2")]],
+            input[[make_id("a1sub1")]],
+            input[[make_id("a1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a1siz")]],
+            input[[make_id("a1col2")]],
+            input[[make_id("a1ord2")]],
+            input[[make_id("a1fsz")]],
+            input[[make_id("a1asp")]],
+            input[[make_id("a1txt")]],
+            stage_split = input[[make_id("a1split")]]
+          )
+        )
+      }
+    )
+
+    # ---- Tab a2: CellInfo vs CellInfo ----
+    output[[make_id("a2oup1")]] <- renderPlot({
+      with_dark(
+        scDRcell,
+        get_conf(),
+        get_meta(),
+        input[[make_id("a2drX")]],
+        input[[make_id("a2drY")]],
+        input[[make_id("a2inp1")]],
+        input[[make_id("a2sub1")]],
+        input[[make_id("a2sub2")]],
+        input[[make_id("a2siz")]],
+        input[[make_id("a2col1")]],
+        input[[make_id("a2ord1")]],
+        input[[make_id("a2fsz")]],
+        input[[make_id("a2asp")]],
+        input[[make_id("a2txt")]],
+        input[[make_id("a2lab1")]]
+      )
+    })
+    output[[make_id("a2oup1.ui")]] <- renderUI({
+      plotOutput(make_id("a2oup1"), height = pList[input[[make_id("a2psz")]]])
+    })
+    output[[make_id("a2oup1.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a2drX")]], "_", input[[make_id("a2drY")]], "_", input[[make_id("a2inp1")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("a2oup1.h")]],
+          width = input[[make_id("a2oup1.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRcell,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a2drX")]],
+            input[[make_id("a2drY")]],
+            input[[make_id("a2inp1")]],
+            input[[make_id("a2sub1")]],
+            input[[make_id("a2sub2")]],
+            input[[make_id("a2siz")]],
+            input[[make_id("a2col1")]],
+            input[[make_id("a2ord1")]],
+            input[[make_id("a2fsz")]],
+            input[[make_id("a2asp")]],
+            input[[make_id("a2txt")]],
+            input[[make_id("a2lab1")]]
+          )
+        )
+      }
+    )
+    output[[make_id("a2oup1.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a2drX")]], "_", input[[make_id("a2drY")]], "_", input[[make_id("a2inp1")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("a2oup1.h")]],
+          width = input[[make_id("a2oup1.w")]],
+          plot = with_dark_static(
+            scDRcell,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a2drX")]],
+            input[[make_id("a2drY")]],
+            input[[make_id("a2inp1")]],
+            input[[make_id("a2sub1")]],
+            input[[make_id("a2sub2")]],
+            input[[make_id("a2siz")]],
+            input[[make_id("a2col1")]],
+            input[[make_id("a2ord1")]],
+            input[[make_id("a2fsz")]],
+            input[[make_id("a2asp")]],
+            input[[make_id("a2txt")]],
+            input[[make_id("a2lab1")]]
+          )
+        )
+      }
+    )
+
+    output[[make_id("a2oup2")]] <- renderPlot({
+      with_dark(
+        scDRcell,
+        get_conf(),
+        get_meta(),
+        input[[make_id("a2drX")]],
+        input[[make_id("a2drY")]],
+        input[[make_id("a2inp2")]],
+        input[[make_id("a2sub1")]],
+        input[[make_id("a2sub2")]],
+        input[[make_id("a2siz")]],
+        input[[make_id("a2col2")]],
+        input[[make_id("a2ord2")]],
+        input[[make_id("a2fsz")]],
+        input[[make_id("a2asp")]],
+        input[[make_id("a2txt")]],
+        input[[make_id("a2lab2")]]
+      )
+    })
+    output[[make_id("a2oup2.ui")]] <- renderUI({
+      plotOutput(make_id("a2oup2"), height = pList[input[[make_id("a2psz")]]])
+    })
+    output[[make_id("a2oup2.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a2drX")]], "_", input[[make_id("a2drY")]], "_", input[[make_id("a2inp2")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("a2oup2.h")]],
+          width = input[[make_id("a2oup2.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRcell,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a2drX")]],
+            input[[make_id("a2drY")]],
+            input[[make_id("a2inp2")]],
+            input[[make_id("a2sub1")]],
+            input[[make_id("a2sub2")]],
+            input[[make_id("a2siz")]],
+            input[[make_id("a2col2")]],
+            input[[make_id("a2ord2")]],
+            input[[make_id("a2fsz")]],
+            input[[make_id("a2asp")]],
+            input[[make_id("a2txt")]],
+            input[[make_id("a2lab2")]]
+          )
+        )
+      }
+    )
+    output[[make_id("a2oup2.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a2drX")]], "_", input[[make_id("a2drY")]], "_", input[[make_id("a2inp2")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("a2oup2.h")]],
+          width = input[[make_id("a2oup2.w")]],
+          plot = with_dark_static(
+            scDRcell,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a2drX")]],
+            input[[make_id("a2drY")]],
+            input[[make_id("a2inp2")]],
+            input[[make_id("a2sub1")]],
+            input[[make_id("a2sub2")]],
+            input[[make_id("a2siz")]],
+            input[[make_id("a2col2")]],
+            input[[make_id("a2ord2")]],
+            input[[make_id("a2fsz")]],
+            input[[make_id("a2asp")]],
+            input[[make_id("a2txt")]],
+            input[[make_id("a2lab2")]]
+          )
+        )
+      }
+    )
+
+    # ---- Tab a3: GeneExpr vs GeneExpr ----
+    output[[make_id("a3oup1")]] <- renderPlot({
+      with_dark(
+        scDRgene,
+        get_conf(),
+        get_meta(),
+        input[[make_id("a3drX")]],
+        input[[make_id("a3drY")]],
+        input[[make_id("a3inp1")]],
+        input[[make_id("a3sub1")]],
+        input[[make_id("a3sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("a3siz")]],
+        input[[make_id("a3col1")]],
+        input[[make_id("a3ord1")]],
+        input[[make_id("a3fsz")]],
+        input[[make_id("a3asp")]],
+        input[[make_id("a3txt")]]
+      )
+    })
+    output[[make_id("a3oup1.ui")]] <- renderUI({
+      plotOutput(make_id("a3oup1"), height = pList[input[[make_id("a3psz")]]])
+    })
+    output[[make_id("a3oup1.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a3drX")]], "_", input[[make_id("a3drY")]], "_", input[[make_id("a3inp1")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("a3oup1.h")]],
+          width = input[[make_id("a3oup1.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a3drX")]],
+            input[[make_id("a3drY")]],
+            input[[make_id("a3inp1")]],
+            input[[make_id("a3sub1")]],
+            input[[make_id("a3sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a3siz")]],
+            input[[make_id("a3col1")]],
+            input[[make_id("a3ord1")]],
+            input[[make_id("a3fsz")]],
+            input[[make_id("a3asp")]],
+            input[[make_id("a3txt")]]
+          )
+        )
+      }
+    )
+    output[[make_id("a3oup1.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a3drX")]], "_", input[[make_id("a3drY")]], "_", input[[make_id("a3inp1")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("a3oup1.h")]],
+          width = input[[make_id("a3oup1.w")]],
+          plot = with_dark_static(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a3drX")]],
+            input[[make_id("a3drY")]],
+            input[[make_id("a3inp1")]],
+            input[[make_id("a3sub1")]],
+            input[[make_id("a3sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a3siz")]],
+            input[[make_id("a3col1")]],
+            input[[make_id("a3ord1")]],
+            input[[make_id("a3fsz")]],
+            input[[make_id("a3asp")]],
+            input[[make_id("a3txt")]]
+          )
+        )
+      }
+    )
+
+    output[[make_id("a3oup2")]] <- renderPlot({
+      with_dark(
+        scDRgene,
+        get_conf(),
+        get_meta(),
+        input[[make_id("a3drX")]],
+        input[[make_id("a3drY")]],
+        input[[make_id("a3inp2")]],
+        input[[make_id("a3sub1")]],
+        input[[make_id("a3sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("a3siz")]],
+        input[[make_id("a3col2")]],
+        input[[make_id("a3ord2")]],
+        input[[make_id("a3fsz")]],
+        input[[make_id("a3asp")]],
+        input[[make_id("a3txt")]]
+      )
+    })
+    output[[make_id("a3oup2.ui")]] <- renderUI({
+      plotOutput(make_id("a3oup2"), height = pList[input[[make_id("a3psz")]]])
+    })
+    output[[make_id("a3oup2.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a3drX")]], "_", input[[make_id("a3drY")]], "_", input[[make_id("a3inp2")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("a3oup2.h")]],
+          width = input[[make_id("a3oup2.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a3drX")]],
+            input[[make_id("a3drY")]],
+            input[[make_id("a3inp2")]],
+            input[[make_id("a3sub1")]],
+            input[[make_id("a3sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a3siz")]],
+            input[[make_id("a3col2")]],
+            input[[make_id("a3ord2")]],
+            input[[make_id("a3fsz")]],
+            input[[make_id("a3asp")]],
+            input[[make_id("a3txt")]]
+          )
+        )
+      }
+    )
+    output[[make_id("a3oup2.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("a3drX")]], "_", input[[make_id("a3drY")]], "_", input[[make_id("a3inp2")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("a3oup2.h")]],
+          width = input[[make_id("a3oup2.w")]],
+          plot = with_dark_static(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a3drX")]],
+            input[[make_id("a3drY")]],
+            input[[make_id("a3inp2")]],
+            input[[make_id("a3sub1")]],
+            input[[make_id("a3sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a3siz")]],
+            input[[make_id("a3col2")]],
+            input[[make_id("a3ord2")]],
+            input[[make_id("a3fsz")]],
+            input[[make_id("a3asp")]],
+            input[[make_id("a3txt")]]
+          )
+        )
+      }
+    )
+
+    # ---- Tab b2: Gene coexpression ----
+    output[[make_id("b2oup1")]] <- renderPlot({
+      with_dark(
+        scDRcoex,
+        get_conf(),
+        get_meta(),
+        input[[make_id("b2drX")]],
+        input[[make_id("b2drY")]],
+        input[[make_id("b2inp1")]],
+        input[[make_id("b2inp2")]],
+        input[[make_id("b2sub1")]],
+        input[[make_id("b2sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("b2siz")]],
+        input[[make_id("b2col1")]],
+        input[[make_id("b2ord1")]],
+        input[[make_id("b2fsz")]],
+        input[[make_id("b2asp")]],
+        input[[make_id("b2txt")]]
+      )
+    })
+    output[[make_id("b2oup1.ui")]] <- renderUI({
+      plotOutput(make_id("b2oup1"), height = pList2[input[[make_id("b2psz")]]])
+    })
+    output[[make_id("b2oup1.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("b2drX")]], "_", input[[make_id("b2drY")]], "_", input[[make_id("b2inp1")]], "_", input[[make_id("b2inp2")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("b2oup1.h")]],
+          width = input[[make_id("b2oup1.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRcoex,
+            get_conf(),
+            get_meta(),
+            input[[make_id("b2drX")]],
+            input[[make_id("b2drY")]],
+            input[[make_id("b2inp1")]],
+            input[[make_id("b2inp2")]],
+            input[[make_id("b2sub1")]],
+            input[[make_id("b2sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("b2siz")]],
+            input[[make_id("b2col1")]],
+            input[[make_id("b2ord1")]],
+            input[[make_id("b2fsz")]],
+            input[[make_id("b2asp")]],
+            input[[make_id("b2txt")]]
+          )
+        )
+      }
+    )
+    output[[make_id("b2oup1.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("b2drX")]], "_", input[[make_id("b2drY")]], "_", input[[make_id("b2inp1")]], "_", input[[make_id("b2inp2")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("b2oup1.h")]],
+          width = input[[make_id("b2oup1.w")]],
+          plot = with_dark_static(
+            scDRcoex,
+            get_conf(),
+            get_meta(),
+            input[[make_id("b2drX")]],
+            input[[make_id("b2drY")]],
+            input[[make_id("b2inp1")]],
+            input[[make_id("b2inp2")]],
+            input[[make_id("b2sub1")]],
+            input[[make_id("b2sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("b2siz")]],
+            input[[make_id("b2col1")]],
+            input[[make_id("b2ord1")]],
+            input[[make_id("b2fsz")]],
+            input[[make_id("b2asp")]],
+            input[[make_id("b2txt")]]
+          )
+        )
+      }
+    )
+
+    output[[make_id("b2oup2")]] <- renderPlot({
+      with_dark(
+        scDRcoexLeg,
+        input[[make_id("b2inp1")]],
+        input[[make_id("b2inp2")]],
+        input[[make_id("b2col1")]],
+        input[[make_id("b2fsz")]]
+      )
+    })
+    output[[make_id("b2oup2.ui")]] <- renderUI({
+      plotOutput(make_id("b2oup2"), height = "220px")
+    })
+    output[[make_id("b2oup2.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, "_coex_legend.pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = 3,
+          width = 5,
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scDRcoexLeg,
+            input[[make_id("b2inp1")]],
+            input[[make_id("b2inp2")]],
+            input[[make_id("b2col1")]],
+            input[[make_id("b2fsz")]]
+          )
+        )
+      }
+    )
+    output[[make_id("b2oup2.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, "_coex_legend.png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = 3,
+          width = 5,
+          plot = with_dark_static(
+            scDRcoexLeg,
+            input[[make_id("b2inp1")]],
+            input[[make_id("b2inp2")]],
+            input[[make_id("b2col1")]],
+            input[[make_id("b2fsz")]]
+          )
+        )
+      }
+    )
+
+    output[[make_id("b2.dt")]] <- renderDataTable({
+      ggData <- scDRcoexNum(
+        get_conf(),
+        get_meta(),
+        input[[make_id("b2inp1")]],
+        input[[make_id("b2inp2")]],
+        input[[make_id("b2sub1")]],
+        input[[make_id("b2sub2")]],
+        gexpr_path,
+        get_gene()
+      )
+      datatable(
+        ggData,
+        rownames = FALSE,
+        extensions = "Buttons",
+        server = TRUE,
+        options = list(
+          pageLength = 50,
+          lengthMenu = c(25, 50, 100),
+          deferRender = TRUE,
+          dom = "tBfrtip",
+          buttons = c("copy", "csv", "excel")
+        )
+      ) %>% formatRound(columns = c("percent"), digits = 2)
+    })
+
+    # ---- Tab c1: Violinplot / Boxplot ----
+    output[[make_id("c1oup")]] <- renderPlot({
+      with_dark(
+        scVioBox,
+        get_conf(),
+        get_meta(),
+        input[[make_id("c1inp1")]],
+        input[[make_id("c1inp2")]],
+        input[[make_id("c1sub1")]],
+        input[[make_id("c1sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("c1typ")]],
+        input[[make_id("c1pts")]],
+        input[[make_id("c1siz")]],
+        input[[make_id("c1fsz")]]
+      )
+    })
+    output[[make_id("c1oup.ui")]] <- renderUI({
+      plotOutput(make_id("c1oup"), height = pList2[input[[make_id("c1psz")]]])
+    })
+    output[[make_id("c1oup.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("c1typ")]], "_", input[[make_id("c1inp1")]], "_", input[[make_id("c1inp2")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("c1oup.h")]],
+          width = input[[make_id("c1oup.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scVioBox,
+            get_conf(),
+            get_meta(),
+            input[[make_id("c1inp1")]],
+            input[[make_id("c1inp2")]],
+            input[[make_id("c1sub1")]],
+            input[[make_id("c1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("c1typ")]],
+            input[[make_id("c1pts")]],
+            input[[make_id("c1siz")]],
+            input[[make_id("c1fsz")]]
+          )
+        )
+      }
+    )
+    output[[make_id("c1oup.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("c1typ")]], "_", input[[make_id("c1inp1")]], "_", input[[make_id("c1inp2")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("c1oup.h")]],
+          width = input[[make_id("c1oup.w")]],
+          plot = with_dark_static(
+            scVioBox,
+            get_conf(),
+            get_meta(),
+            input[[make_id("c1inp1")]],
+            input[[make_id("c1inp2")]],
+            input[[make_id("c1sub1")]],
+            input[[make_id("c1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("c1typ")]],
+            input[[make_id("c1pts")]],
+            input[[make_id("c1siz")]],
+            input[[make_id("c1fsz")]]
+          )
+        )
+      }
+    )
+
+    # ---- Tab c2: Proportion plot ----
+    output[[make_id("c2oup")]] <- renderPlot({
+      with_dark(
+        scProp,
+        get_conf(),
+        get_meta(),
+        input[[make_id("c2inp1")]],
+        input[[make_id("c2inp2")]],
+        input[[make_id("c2sub1")]],
+        input[[make_id("c2sub2")]],
+        input[[make_id("c2typ")]],
+        input[[make_id("c2flp")]],
+        input[[make_id("c2fsz")]]
+      )
+    })
+    output[[make_id("c2oup.ui")]] <- renderUI({
+      plotOutput(make_id("c2oup"), height = pList2[input[[make_id("c2psz")]]])
+    })
+    output[[make_id("c2oup.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("c2typ")]], "_", input[[make_id("c2inp1")]], "_", input[[make_id("c2inp2")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("c2oup.h")]],
+          width = input[[make_id("c2oup.w")]],
+          useDingbats = FALSE,
+          plot = with_dark_static(
+            scProp,
+            get_conf(),
+            get_meta(),
+            input[[make_id("c2inp1")]],
+            input[[make_id("c2inp2")]],
+            input[[make_id("c2sub1")]],
+            input[[make_id("c2sub2")]],
+            input[[make_id("c2typ")]],
+            input[[make_id("c2flp")]],
+            input[[make_id("c2fsz")]]
+          )
+        )
+      }
+    )
+    output[[make_id("c2oup.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("c2typ")]], "_", input[[make_id("c2inp1")]], "_", input[[make_id("c2inp2")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("c2oup.h")]],
+          width = input[[make_id("c2oup.w")]],
+          plot = with_dark_static(
+            scProp,
+            get_conf(),
+            get_meta(),
+            input[[make_id("c2inp1")]],
+            input[[make_id("c2inp2")]],
+            input[[make_id("c2sub1")]],
+            input[[make_id("c2sub2")]],
+            input[[make_id("c2typ")]],
+            input[[make_id("c2flp")]],
+            input[[make_id("c2fsz")]]
+          )
+        )
+      }
+    )
+
+    # ---- Tab d1: Bubbleplot / Heatmap ----
+    output[[make_id("d1oupTxt")]] <- renderUI({
+      geneList <- scGeneList(input[[make_id("d1inp")]], get_gene())
+      if (nrow(geneList) > 50) {
+        HTML("More than 50 input genes! Please reduce the gene list!")
+      } else {
+        oup <- paste0(nrow(geneList[present == TRUE]), " genes OK and will be plotted")
+        if (nrow(geneList[present == FALSE]) > 0) {
+          oup <- paste0(
+            oup,
+            "<br/>",
+            nrow(geneList[present == FALSE]),
+            " genes not found (",
+            paste0(geneList[present == FALSE]$gene, collapse = ", "),
+            ")"
+          )
+        }
+        HTML(oup)
+      }
+    })
+
+    output[[make_id("d1oup")]] <- renderPlot({
+      with_dark(
+        scBubbHeat,
+        get_conf(),
+        get_meta(),
+        input[[make_id("d1inp")]],
+        input[[make_id("d1grp")]],
+        input[[make_id("d1plt")]],
+        input[[make_id("d1sub1")]],
+        input[[make_id("d1sub2")]],
+        gexpr_path,
+        get_gene(),
+        input[[make_id("d1scl")]],
+        input[[make_id("d1row")]],
+        input[[make_id("d1col")]],
+        input[[make_id("d1cols")]],
+        input[[make_id("d1fsz")]]
+      )
+    })
+    output[[make_id("d1oup.ui")]] <- renderUI({
+      plotOutput(make_id("d1oup"), height = pList3[input[[make_id("d1psz")]]])
+    })
+    output[[make_id("d1oup.pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("d1plt")]], "_", input[[make_id("d1grp")]], ".pdf"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("d1oup.h")]],
+          width = input[[make_id("d1oup.w")]],
+          plot = with_dark_static(
+            scBubbHeat,
+            get_conf(),
+            get_meta(),
+            input[[make_id("d1inp")]],
+            input[[make_id("d1grp")]],
+            input[[make_id("d1plt")]],
+            input[[make_id("d1sub1")]],
+            input[[make_id("d1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("d1scl")]],
+            input[[make_id("d1row")]],
+            input[[make_id("d1col")]],
+            input[[make_id("d1cols")]],
+            input[[make_id("d1fsz")]],
+            save = TRUE
+          )
+        )
+      }
+    )
+    output[[make_id("d1oup.png")]] <- downloadHandler(
+      filename = function() paste0(prefix, input[[make_id("d1plt")]], "_", input[[make_id("d1grp")]], ".png"),
+      content = function(file) {
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("d1oup.h")]],
+          width = input[[make_id("d1oup.w")]],
+          plot = with_dark_static(
+            scBubbHeat,
+            get_conf(),
+            get_meta(),
+            input[[make_id("d1inp")]],
+            input[[make_id("d1grp")]],
+            input[[make_id("d1plt")]],
+            input[[make_id("d1sub1")]],
+            input[[make_id("d1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("d1scl")]],
+            input[[make_id("d1row")]],
+            input[[make_id("d1col")]],
+            input[[make_id("d1cols")]],
+            input[[make_id("d1fsz")]],
+            save = TRUE
+          )
+        )
+      }
+    )
+  }
+
+  bind_main_figures(
+    "sc3",
+    get_conf = function() sc3conf,
+    get_meta = function() sc3meta
+  )
+  bind_main_figures(
+    "sc4",
+    get_conf = function() sc4conf,
+    get_meta = function() sc4meta
+  )
+  bind_main_figures(
+    "sc5",
+    get_conf = function() sc5conf,
+    get_meta = function() sc5meta
+  )
+  bind_main_figures(
+    "sc6",
+    get_conf = function() sc6conf,
+    get_meta = function() sc6meta
+  )
+  bind_main_figures(
+    "sc7",
+    get_conf = function() sc7conf,
+    get_meta = function() sc7meta
+  )
+
+  bind_shinycell_dataset(
+    "sc4",
+    get_conf = function() sc4conf,
+    get_meta = function() sc4meta,
+    get_def = function() sc4def,
+    get_gene = function() sc4gene,
+    gexpr_path = "sc4gexpr.h5"
+  )
+  bind_shinycell_dataset(
+    "sc5",
+    get_conf = function() sc5conf,
+    get_meta = function() sc5meta,
+    get_def = function() sc5def,
+    get_gene = function() sc5gene,
+    gexpr_path = "sc5gexpr.h5"
+  )
+  bind_shinycell_dataset(
+    "sc6",
+    get_conf = function() sc6conf,
+    get_meta = function() sc6meta,
+    get_def = function() sc6def,
+    get_gene = function() sc6gene,
+    gexpr_path = "sc6gexpr.h5"
+  )
+  bind_shinycell_dataset(
+    "sc7",
+    get_conf = function() sc7conf,
+    get_meta = function() sc7meta,
+    get_def = function() sc7def,
+    get_gene = function() sc7gene,
+    gexpr_path = "sc7gexpr.h5"
+  )
 # optCrt="{ option_create: function(data,escape) {return('<div class=\"create\"><strong>' + '</strong></div>');} }" 
 #   observe({
 #     req(exists("sc1gene", inherits = TRUE))
@@ -3404,7 +4672,8 @@ shinyServer(function(input, output, session) {
     with_dark(scDRcell, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp1,  
              input$sc3a1sub1, input$sc3a1sub2, 
              input$sc3a1siz, input$sc3a1col1, input$sc3a1ord1, 
-             input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt, input$sc3a1lab1) 
+             input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt, input$sc3a1lab1,
+             stage_split = input$sc3a1split) 
   }) 
   output$sc3a1oup1.ui <- renderUI({ 
     plotOutput("sc3a1oup1", height = pList[input$sc3a1psz]) 
@@ -3417,7 +4686,8 @@ shinyServer(function(input, output, session) {
       plot = with_dark_static(scDRcell, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp1,   
                       input$sc3a1sub1, input$sc3a1sub2, 
                       input$sc3a1siz, input$sc3a1col1, input$sc3a1ord1,  
-                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt, input$sc3a1lab1) ) 
+                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt, input$sc3a1lab1,
+                      stage_split = input$sc3a1split) ) 
     }) 
   output$sc3a1oup1.png <- downloadHandler( 
     filename = function() { paste0("sc3",input$sc3a1drX,"_",input$sc3a1drY,"_",  
@@ -3427,7 +4697,8 @@ shinyServer(function(input, output, session) {
       plot = with_dark_static(scDRcell, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp1,   
                       input$sc3a1sub1, input$sc3a1sub2, 
                       input$sc3a1siz, input$sc3a1col1, input$sc3a1ord1,  
-                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt, input$sc3a1lab1) ) 
+                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt, input$sc3a1lab1,
+                      stage_split = input$sc3a1split) ) 
     }) 
   output$sc3a1.dt <- renderDataTable({ 
     ggData = scDRnum(sc3conf, sc3meta, input$sc3a1inp1, input$sc3a1inp2, 
@@ -3454,7 +4725,8 @@ shinyServer(function(input, output, session) {
              input$sc3a1sub1, input$sc3a1sub2, 
              "sc3gexpr.h5", sc3gene, 
              input$sc3a1siz, input$sc3a1col2, input$sc3a1ord2, 
-             input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt) 
+             input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt,
+             stage_split = input$sc3a1split) 
   }) 
   output$sc3a1oup2.ui <- renderUI({ 
     plotOutput("sc3a1oup2", height = pList[input$sc3a1psz]) 
@@ -3464,22 +4736,24 @@ shinyServer(function(input, output, session) {
                                    input$sc3a1inp2,".pdf") }, 
     content = function(file) { ggsave( 
       file, device = "pdf", height = input$sc3a1oup2.h, width = input$sc3a1oup2.w, useDingbats = FALSE, 
-      plot = with_dark_static(scDRgene, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp2,  
+      plot = with_dark_static(scDRgene, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp2,   
                       input$sc3a1sub1, input$sc3a1sub2, 
                       "sc3gexpr.h5", sc3gene, 
                       input$sc3a1siz, input$sc3a1col2, input$sc3a1ord2, 
-                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt) ) 
+                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt,
+                      stage_split = input$sc3a1split) ) 
     }) 
   output$sc3a1oup2.png <- downloadHandler( 
     filename = function() { paste0("sc3",input$sc3a1drX,"_",input$sc3a1drY,"_",  
                                    input$sc3a1inp2,".png") }, 
     content = function(file) { ggsave( 
       file, device = "png", height = input$sc3a1oup2.h, width = input$sc3a1oup2.w, 
-      plot = with_dark_static(scDRgene, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp2,  
+      plot = with_dark_static(scDRgene, sc3conf, sc3meta, input$sc3a1drX, input$sc3a1drY, input$sc3a1inp2,   
                       input$sc3a1sub1, input$sc3a1sub2, 
                       "sc3gexpr.h5", sc3gene, 
                       input$sc3a1siz, input$sc3a1col2, input$sc3a1ord2, 
-                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt) ) 
+                      input$sc3a1fsz, input$sc3a1asp, input$sc3a1txt,
+                      stage_split = input$sc3a1split) ) 
     }) 
   
   

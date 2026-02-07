@@ -111,11 +111,11 @@ ra_taglist <- function(...) {
 
 build_common_controls <- function(prefix, block, conf, def) {
   make_id <- function(suffix) paste0(prefix, block, suffix)
-  base <- list(
-    ra_rowgroup(
-      "Dimension reduction",
-      ra_field(
-        "X-axis",
+    base <- list(
+      ra_rowgroup(
+        "Dimension reduction",
+        ra_field(
+          "X-axis",
         selectInput(
           inputId = make_id("drX"),
           label = NULL,
@@ -159,55 +159,63 @@ build_common_controls <- function(prefix, block, conf, def) {
           class = "btn btn-outline-secondary btn-sm"
         )
       )
-    ),
-    ra_rowgroup(
-      "Display options",
-      ra_field(
-        "Point size",
-        sliderInput(
-          inputId = make_id("siz"),
-          label = NULL,
-          min = 0,
-          max = 4,
-          value = 1.25,
-          step = 0.25
-        )
       ),
-      ra_field(
-        "Plot size",
-        radioButtons(
-          inputId = make_id("psz"),
-          label = NULL,
-          choices = c("Small", "Medium", "Large"),
-          selected = "Medium",
-          inline = TRUE
-        )
-      ),
-      ra_field(
-        "Font size",
-        radioButtons(
-          inputId = make_id("fsz"),
-          label = NULL,
-          choices = c("Small", "Medium", "Large"),
-          selected = "Medium",
-          inline = TRUE
-        )
-      ),
-      ra_field(
-        "Aspect ratio",
-        radioButtons(
-          inputId = make_id("asp"),
-          label = NULL,
-          choices = c("Square", "Fixed", "Free"),
-          selected = "Square",
-          inline = TRUE
-        )
-      ),
-      tags$div(
-        class = "ra-field-checkbox",
-        checkboxInput(
-          inputId = make_id("txt"),
-          label = "Show axis text",
+      ra_rowgroup(
+        "Display options",
+        ra_field(
+          "Point size",
+          sliderInput(
+            inputId = make_id("siz"),
+            label = NULL,
+            min = 0,
+            max = 4,
+            value = 1.25,
+            step = 0.25
+          )
+        ),
+        ra_field(
+          "Plot size",
+          radioButtons(
+            inputId = make_id("psz"),
+            label = NULL,
+            choices = c("Small", "Medium", "Large"),
+            selected = "Large",
+            inline = TRUE
+          )
+        ),
+        ra_field(
+          "Font size",
+          radioButtons(
+            inputId = make_id("fsz"),
+            label = NULL,
+            choices = c("Small", "Medium", "Large"),
+            selected = "Medium",
+            inline = TRUE
+          )
+        ),
+        ra_field(
+          "Aspect ratio",
+          radioButtons(
+            inputId = make_id("asp"),
+            label = NULL,
+            choices = c("Square", "Fixed", "Free"),
+            selected = "Free",
+            inline = TRUE
+          )
+        ),
+        ra_field(
+          "Split by stage (sample)",
+          checkboxInput(
+            inputId = make_id("split"),
+            label = NULL,
+            value = TRUE
+          )
+        ),
+        tags$div(
+          class = "ra-field-checkbox",
+          checkboxInput(
+            inputId = make_id("txt"),
+            label = "Show axis text",
           value = FALSE
         )
       )
@@ -420,6 +428,110 @@ build_gene_output_section <- function(prefix,
       width_value = width_value
     )
   )
+}
+
+build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
+  make_id <- function(part) paste0(prefix, "mf", part)
+
+  # Main Figures are currently defined around the specificCellID.1 annotation.
+  target_ui <- "specificCellID.1"
+  levels_raw <- conf[UI == target_ui]$fID
+  levels_raw <- if (length(levels_raw) && !is.na(levels_raw[[1]])) levels_raw[[1]] else ""
+  cell_levels <- if (nzchar(levels_raw)) strsplit(levels_raw, "\\|")[[1]] else character(0)
+
+  controls_card <- tags$div(
+    class = "ra-card ra-controls glass-card mainfig-controls",
+    ra_card_head(
+      sprintf("%s Main Figures", dataset_name),
+      "Select which annotated cell groups to emphasize across the UMAP panels."
+    ),
+    ra_rowgroup(
+      "Cell selection",
+      checkboxGroupInput(
+        inputId = make_id("cells"),
+        label = NULL,
+        choices = cell_levels,
+        selected = cell_levels,
+        inline = FALSE
+      ),
+      ra_button_row(
+        actionButton(
+          inputId = make_id("all"),
+          label = "Select all groups",
+          class = "btn btn-primary btn-sm"
+        ),
+        actionButton(
+          inputId = make_id("none"),
+          label = "Deselect all groups",
+          class = "btn btn-outline-secondary btn-sm"
+        )
+      ),
+      ra_field(
+        "Main UMAP point size",
+        sliderInput(
+          inputId = make_id("pt"),
+          label = NULL,
+          min = 1,
+          max = 5,
+          value = 2.5,
+          step = 0.1
+        )
+      )
+    )
+  )
+
+  main_plot_card <- tags$div(
+    class = "ra-card ra-plot glass-card mainfig-main",
+    ra_card_head(
+      "UMAP Overview",
+      sprintf("UMAP1 vs UMAP2 coloured by %s (not split by stage).", target_ui)
+    ),
+    ra_rowgroup(
+      NULL,
+      tags$div(
+        class = "ra-plot-holder mainfig-plot-holder",
+        tags$div(
+          class = "mainfig-square",
+          plotOutput(make_id("main"), height = "100%", width = "100%")
+        )
+      )
+    )
+  )
+
+  split_plot_card <- tags$div(
+    class = "ra-card ra-plot glass-card mainfig-split",
+    ra_card_head(
+      "Stage-Split UMAPs",
+      sprintf("Same view split by stage (I–XII), coloured by %s.", target_ui)
+    ),
+    ra_rowgroup(
+      NULL,
+      tags$div(
+        class = "ra-plot-holder",
+        plotOutput(make_id("split"), height = "420px", width = "100%")
+      )
+    )
+  )
+
+  content <- tags$div(
+    class = sprintf("legacy-stack %s-mainfig-stack", prefix),
+    tags$div(
+      class = "legacy-pane mainfig-pane",
+      controls_card,
+      main_plot_card
+    ),
+    split_plot_card
+  )
+
+  if (as_tab) {
+    tabPanel(
+      title = HTML("Main Figures"),
+      value = sprintf("%s_main_figures", prefix),
+      content
+    )
+  } else {
+    content
+  }
 }
 
 build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
@@ -788,7 +900,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("psz"),
         label = NULL,
         choices = c("Small", "Medium", "Large"),
-        selected = "Medium",
+        selected = "Large",
         inline = TRUE
       )
     ),
@@ -1168,7 +1280,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("psz"),
         label = NULL,
         choices = c("Small", "Medium", "Large"),
-        selected = "Medium",
+        selected = "Large",
         inline = TRUE
       )
     ),
@@ -1357,7 +1469,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
         inputId = make_id("psz"),
         label = NULL,
         choices = c("Small", "Medium", "Large"),
-        selected = "Medium",
+        selected = "Large",
         inline = TRUE
       )
     ),

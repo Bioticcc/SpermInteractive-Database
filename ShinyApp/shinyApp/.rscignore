@@ -6,6 +6,12 @@ final_staged_object_slim.rds
 final_staged_object_slim_nocounts.rds
 specificCellID*.rds
 
+# New subset Seurat objects (raw) - assets are generated into sc4–sc7 files.
+02_Sertoli.rds
+03_Spermatogonia_original.rds
+04_Spermatocyte_updated.rds
+05_Spermatid.rds
+
 # Disabled datasets for launch build
 sc1*
 sc2*

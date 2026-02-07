@@ -24,6 +24,18 @@ theme_default <- theme_light
 sc3conf = readRDS("sc3conf.rds")
 sc3def  = readRDS("sc3def.rds")
 
+sc4conf = readRDS("sc4conf.rds")
+sc4def  = readRDS("sc4def.rds")
+
+sc5conf = readRDS("sc5conf.rds")
+sc5def  = readRDS("sc5def.rds")
+
+sc6conf = readRDS("sc6conf.rds")
+sc6def  = readRDS("sc6def.rds")
+
+sc7conf = readRDS("sc7conf.rds")
+sc7def  = readRDS("sc7def.rds")
+
 source("ra_tabs.R")
 
 shinyUI(
@@ -554,7 +566,9 @@ tags$div(
       )
     ),
     tags$p(class = "hdr-subtitle",
-           "An Interactive Dataset for Exploring Spermatogenesis")
+           "An Interactive Dataset for Exploring Spermatogenesis"),
+    tags$p(class = "hdr-version",
+           "Version 0.3")
   ),
   # Right: clickable logo button
   tags$div(
@@ -797,7 +811,14 @@ navbarPage(
               tags$li("Pick a figure type and set filters (genes, stages, cell groups)."),
               tags$li("Customize aesthetics and download your figure.")
             ),
-            p(em("You can return here anytime from the “Home” tab."))
+            div(
+              class = "tutorial-btn-wrap",
+              actionButton(
+                inputId = "open_tutorial",
+                label = "Read Extended Tutorial",
+                class = "btn btn-primary btn-sm tutorial-btn"
+              )
+            )
         )
       )
     ),
@@ -809,7 +830,8 @@ navbarPage(
         div(class = "home-card",
             h3("Our Custom Interactive Figures (Based on Staged Testis Dataset)"),
             p("These interactive views reproduce and extend figures from the paper using our pre-loaded Seurat objects:"),
-            fluidRow(
+            tags$div(
+              class = "row home-icon-grid",
               column(
                 width = 3,
                 tags$a(
@@ -817,12 +839,12 @@ navbarPage(
                   href = "#",
                   role = "button",
                   tabindex = "0",
-                  `data-target-tab` = "sc3_cellinfo_gene",
+                  `data-target-tab` = "sc3_main_figures",
                   onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
                   div(
                     class = "home-card",
                     tags$img(
-                      src = "staged_testis_umap_preview.png",
+                      src = "Staged_Testis_Icon.png",
                       class = "home-card-preview",
                       loading = "lazy",
                       alt = "Preview of the staged testis UMAP embeddings"
@@ -898,6 +920,97 @@ navbarPage(
                   )
                 )
               )
+            ),
+            tags$div(
+              class = "row home-icon-grid",
+              column(
+                width = 3,
+                tags$a(
+                  class = "home-card-link",
+                  href = "#",
+                  role = "button",
+                  tabindex = "0",
+                  `data-target-tab` = "sc4_main_figures",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+                  div(
+                    class = "home-card",
+                    tags$img(
+                      src = "Sertoli_Subset_Icon.png",
+                      class = "home-card-preview",
+                      loading = "lazy",
+                      alt = "Preview of Sertoli subset"
+                    ),
+                    h4("Sertoli Subset"),
+                    p("Interactive figures for the Sertoli Subset of the main seurat.")
+                  )
+                )
+              ),
+              column(
+                width = 3,
+                tags$a(
+                  class = "home-card-link",
+                  href = "#",
+                  role = "button",
+                  tabindex = "0",
+                  `data-target-tab` = "sc5_main_figures",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+                  div(
+                    class = "home-card",
+                    tags$img(
+                      src = "Spermatogonia_Subset_Icon.png",
+                      class = "home-card-preview",
+                      loading = "lazy",
+                      alt = "Preview of Spermatogonia subset"
+                    ),
+                    h4("Spermatogonia Subset"),
+                    p("Interactive figures for the Spermatogonia Subset of the main seurat.")
+                  )
+                )
+              ),
+              column(
+                width = 3,
+                tags$a(
+                  class = "home-card-link",
+                  href = "#",
+                  role = "button",
+                  tabindex = "0",
+                  `data-target-tab` = "sc6_main_figures",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+                  div(
+                    class = "home-card",
+                    tags$img(
+                      src = "Spermatocyte_Subset_Icon.png",
+                      class = "home-card-preview",
+                      loading = "lazy",
+                      alt = "Preview of Spermatocyte subset"
+                    ),
+                    h4("Spermatocyte Subset"),
+                    p("Interactive figures for the Spermatocyte Subset of the main seurat.")
+                  )
+                )
+              ),
+              column(
+                width = 3,
+                tags$a(
+                  class = "home-card-link",
+                  href = "#",
+                  role = "button",
+                  tabindex = "0",
+                  `data-target-tab` = "sc7_main_figures",
+                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+                  div(
+                    class = "home-card",
+                    tags$img(
+                      src = "Spermatid_Subset_Icon.png",
+                      class = "home-card-preview",
+                      loading = "lazy",
+                      alt = "Preview of Spermatid subset"
+                    ),
+                    h4("Spermatid Subset"),
+                    p("Interactive figures for the Spermatid Subset of the main seurat.")
+                  )
+                )
+              )
             )
         )
       )
@@ -909,6 +1022,7 @@ navbarPage(
   
     navbarMenu(
     "Staged Testis",
+    build_main_figures_tab("sc3", sc3conf, sc3def, "Staged Testis"),
     build_cellinfo_gene_tab("sc3", sc3conf, sc3def, "Staged Testis"),
     build_cellinfo_cellinfo_tab("sc3", sc3conf, sc3def, "Staged Testis"),
     build_gene_gene_tab("sc3", sc3conf, sc3def, "Staged Testis"),
@@ -916,6 +1030,50 @@ navbarPage(
     build_violin_boxplot_tab("sc3", sc3conf, sc3def, "Staged Testis"),
     build_proportion_plot_tab("sc3", sc3conf, sc3def, "Staged Testis"),
     build_bubble_heatmap_tab("sc3", sc3conf, sc3def, "Staged Testis")
+  ),
+  navbarMenu(
+    "Sertoli Subset",
+    build_main_figures_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_cellinfo_gene_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_cellinfo_cellinfo_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_gene_gene_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_gene_coexpression_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_violin_boxplot_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_proportion_plot_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
+    build_bubble_heatmap_tab("sc4", sc4conf, sc4def, "Sertoli Subset")
+  ),
+  navbarMenu(
+    "Spermatogonia Subset",
+    build_main_figures_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_cellinfo_gene_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_cellinfo_cellinfo_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_gene_gene_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_gene_coexpression_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_violin_boxplot_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_proportion_plot_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
+    build_bubble_heatmap_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset")
+  ),
+  navbarMenu(
+    "Spermatocyte Subset",
+    build_main_figures_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_cellinfo_gene_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_cellinfo_cellinfo_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_gene_gene_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_gene_coexpression_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_violin_boxplot_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_proportion_plot_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
+    build_bubble_heatmap_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset")
+  ),
+  navbarMenu(
+    "Spermatid Subset",
+    build_main_figures_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_cellinfo_gene_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_cellinfo_cellinfo_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_gene_gene_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_gene_coexpression_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_violin_boxplot_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_proportion_plot_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
+    build_bubble_heatmap_tab("sc7", sc7conf, sc7def, "Spermatid Subset")
   ),
 #   navbarMenu(
 #     "Developemental Testis",
