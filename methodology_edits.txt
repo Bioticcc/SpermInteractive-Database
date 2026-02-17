@@ -1,0 +1,60 @@
+Methodology Draft - Technical and Grammar Corrections
+
+CHANGE LOG (Original -> Revised)
+1) "built using the shinyapp (1.11.1) R package" -> "built using the shiny (v1.11.1) R package"
+2) "vs code" -> "VS Code"
+3) "magritter" -> "magrittr"
+4) "RcolorBrewer" -> "RColorBrewer"
+5) "viridislite" -> "viridisLite"
+6) "Plotting – ggplot2: plotly, ..." -> "Plotting: ggplot2, plotly, ..."
+7) "Deployment: rsconnect, bench, reshape2" -> "Deployment/utility: rsconnect; benchmarking: bench; reshaping in reference scripts: reshape2"
+8) "navbarmenu" -> "navbarMenu"
+9) "tabpanel" -> "tabPanel"
+10) "seurats" -> "Seurat objects"
+11) "which caused crashed due to exceeding the allocated memory" -> "which caused crashes due to memory limits in the deployment container"
+12) "To solve this, we looked to ShinyCell::createConfig() + …" -> "To solve this, we exported compact assets with ShinyCell::createConfig() and ShinyCell::makeShinyFiles()"
+13) "represented the data needed for figures without loading full seurats" -> "preserved the data needed for visualization without loading full Seurat objects at runtime"
+14) "meta data" -> "metadata"
+15) "colormappings" -> "color mappings"
+16) "each having figures that have customizable aspects" -> "each with customizable figure controls"
+17) "similair" -> "similar"
+18) "collapsable" -> "collapsible"
+19) "photoshopped to look like a table of clickable buttons" -> "rendered as a fixed background image with an SVG overlay grid of clickable rectangles"
+20) "send the buttons position to our serer file" -> "send the button ID to the server"
+21) "JS to find each cells expression levels" -> "R computes per-button expression values and JavaScript applies the visual heatmap overlay"
+
+
+CORRECTED VERSION
+
+Code Setup and Packages
+SpermInteractive was built using the shiny (v1.11.1) R package in VS Code (v1.109.2), with R, JavaScript, and CSS as the primary programming languages.
+
+Additional packages used:
+- Core/UI: bslib, shinyhelper, DT
+- Single-cell data: Seurat, ShinyCell, hdf5r, Matrix, data.table, dplyr, magrittr
+- Plotting: ggplot2, plotly, ggrepel, ggdendro, gridExtra, RColorBrewer, scales, viridisLite, patchwork
+- Metadata/serialization: jsonlite
+- Deployment/utility: rsconnect; benchmarking: bench; reshaping in reference scripts: reshape2
+
+The landing page contains 8 primary figure icons that redirect users to their corresponding interactive views. Using navbarMenu navigation and tabPanel subpages, users can open figure-specific pages for each dataset and analysis mode.
+
+
+Data Reduction
+A key issue during development was memory usage. Initially, full Seurat objects were loaded directly in the app, which caused crashes when deployment memory limits were exceeded. To solve this, we exported compact runtime assets using ShinyCell::createConfig() and ShinyCell::makeShinyFiles(), so the app could render figures without loading full Seurat objects into memory.
+
+Each dataset Seurat was exported into:
+- conf.rds: ShinyCell configuration for metadata fields, factor levels, color mappings, and figure controls.
+- def.rds: Default app state for that dataset (initial control selections).
+- gene.rds: Compact gene index mapping gene symbols to expression matrix row indices.
+- meta.rds: Per-cell metadata and embedding coordinates used for grouping/filtering/plotting.
+- gexpr.h5: Chunked HDF5 expression matrix used for on-demand gene reads with lower memory overhead.
+
+
+How Data Was Visualized
+The main dataset ("Staged Testis") and its subset datasets follow the same visualization pattern. Each includes a "Main Figures" tab that displays UMAP embeddings colored by correct_cellTypes (via ggplot2), with user controls for visible cell groups and point size. A second, optional split-by-sample view shows the same embedding faceted by stage.
+
+Other pages in each dataset follow the same interactive design pattern, with customizable figure controls and additional advanced settings in collapsible sections.
+
+The interactive spermatogenesis table is implemented as a fixed background image with an SVG overlay grid. Each SVG rectangle corresponds to one table tile and has a button ID (for example, btn_4_7). Clicking a tile sends that ID to the server, which maps it to sample + specificCellID and opens a modal showing gene expression results for that mapped region.
+
+For the expression heatmap overlay, the server computes per-button expression values for the queried gene from a precomputed matrix (spg_avg_expr_by_button.rds), applies thresholding/scaling, and sends color payloads to the client. JavaScript then applies those colors to the same SVG tile overlay, producing the interactive table heatmap.

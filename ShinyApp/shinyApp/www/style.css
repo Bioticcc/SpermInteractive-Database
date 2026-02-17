@@ -1950,6 +1950,8 @@ html[data-theme='dark'] .hdr-logo:focus-visible{
   backdrop-filter: blur(2px);
   transition: background .2s ease;
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -1969,14 +1971,36 @@ html[data-theme='dark'] .hdr-logo:focus-visible{
   color: var(--color-text, #1f2937);
 }
 
+.shiny-spinner-overlay::before{
+  content: "";
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 4px solid rgba(74, 144, 226, 0.28);
+  border-top-color: var(--spinner-color);
+  background: #ffffff;
+  animation: spinner-ring-spin 0.9s linear infinite;
+}
+
 html[data-theme='dark'] .shiny-spinner-overlay::after{
   color: #e2e8f0;
+}
+
+html[data-theme='dark'] .shiny-spinner-overlay::before{
+  border-color: rgba(148, 163, 184, 0.32);
+  border-top-color: var(--spinner-color);
+  background: #020617;
 }
 
 .shiny-spinner-overlay [class*="lds"],
 .shiny-spinner-overlay [class^="lds"],
 .shiny-spinner-overlay .spinner-border{
   display: none !important;
+}
+
+@keyframes spinner-ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 html[data-theme='dark'] .shiny-notification {
@@ -2285,13 +2309,41 @@ html[data-theme='dark'] .shiny-input-container{
   line-height: 1.3;
   border-radius: 8px;
 }
+.ra-head-main .ra-title{
+  margin: 0;
+}
+.ra-reload-wrap{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+.ra-reload-wrap .btn{
+  margin: 0 auto;
+}
 .ra-card-download{
   position: absolute;
   top: 18px;
   right: 18px;
   display: flex;
   align-items: center;
+  gap: 8px;
   z-index: 5;
+}
+
+.reload-btn{
+  padding: 8px 16px !important;
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(37,99,235,0.25);
+}
+html[data-theme='dark'] .reload-btn{
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: #e8f0ff;
+  box-shadow: 0 8px 18px rgba(59,130,246,0.35);
 }
 .ra-card-download .btn{
   margin: 0;
@@ -2509,6 +2561,21 @@ html[data-theme='dark'] .selectize-control .selectize-input.dropdown-active {
 html[data-theme='dark'] .selectize-dropdown .active {
   background-color: rgba(35,56,116,.75);
   color: #f8fafc;
+}
+
+html[data-theme='dark'] .selectize-control.multi .selectize-input > .item,
+html[data-theme='dark'] .selectize-control.multi .selectize-input > div {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 1px solid #1f2937 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .selectize-control.multi .selectize-input > .item .remove,
+html[data-theme='dark'] .selectize-control.multi .selectize-input > div .remove {
+  color: #ffffff !important;
+  border-left: 1px solid #1f2937 !important;
 }
 
 /* Cell type checkboxes → two columns */
@@ -2888,6 +2955,22 @@ html[data-theme='dark'] .ra-plot-holder{
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+.home-top-row{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.home-top-row > [class*='col-']{
+  display: flex;
+  flex-direction: column;
+}
+
+.home-top-row .home-card{
+  flex: 1 1 auto;
+  width: 100%;
+}
+
 .home-card-preview {
   width: 100%;
   height: auto;
@@ -2939,6 +3022,11 @@ html[data-theme='dark'] .ra-plot-holder{
 
 .home-icon-grid .home-card-preview{
   height: 140px; /* keep preview heights consistent so text aligns */
+}
+
+.home-card-preview.fit-contain{
+  object-fit: contain;
+  background: rgba(247, 249, 252, 0.9);
 }
 
 .home-icon-grid .home-card h4{
@@ -3099,23 +3187,6 @@ html[data-theme='dark'] .theme-card{
 .home-card.home-hero p {
   font-size: 1rem;  /* adjust as needed */
   line-height: 1.7;
-}
-
-.tutorial-btn-wrap{
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
-
-.tutorial-btn{
-  opacity: 0.88;
-  transition: opacity .2s ease, transform .2s ease;
-}
-
-.tutorial-btn:hover,
-.tutorial-btn:focus-visible{
-  opacity: 1;
-  transform: translateY(-1px);
 }
 
 /* Optional: tighter list spacing */

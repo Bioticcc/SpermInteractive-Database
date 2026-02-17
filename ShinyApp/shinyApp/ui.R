@@ -15,6 +15,30 @@ theme_dark <- "dark"
 # Default theme on first load (may be overridden by localStorage).
 theme_default <- theme_light
 
+# Shareable links should capture the full interactive state in the URL.
+enableBookmarking("url")
+
+make_interactive_explanation_box <- function() {
+  tags$div(
+    class = "home-card glass-card",
+    style = "width:100%; margin-top:16px;",
+    tags$p(
+      class = "ra-sub",
+      style = "margin-bottom:0;",
+      "Explanation on why figure x is being shown here! what is important about this figure specifically? what does it mean?"
+    ),
+    tags$br(),
+    tags$br(),
+    tags$br(),
+    tags$br(),
+    tags$br(),
+    tags$br(),
+    tags$br(),
+    tags$br(),
+    tags$br()
+  )
+}
+
 # sc1conf = readRDS("sc1conf.rds")
 # sc1def  = readRDS("sc1def.rds")
 
@@ -567,8 +591,8 @@ tags$div(
     ),
     tags$p(class = "hdr-subtitle",
            "An Interactive Dataset for Exploring Spermatogenesis"),
-    tags$p(class = "hdr-version",
-           "Version 0.3")
+      tags$p(class = "hdr-version",
+           "Version 0.5")
   ),
   # Right: clickable logo button
   tags$div(
@@ -793,13 +817,19 @@ navbarPage(
     
     # ===== Row 1: Welcome (left) + Get Started (right) =====
     fluidRow(
+      class = "home-top-row",
       column(
         width = 8,
         div(class = "home-card home-hero",
             h2("Welcome"),
             p("Explore gene expression throughout mouse spermatogenesis with an an intuitive, interactive interface. ",
               "Query your genes of interest, visualize stage-specific expression patterns, and export publication-ready figures - no coding required! ",
-              "The current release features our staged testis atlas, with developmental time-course and spatial transcription datasets coming soon")
+              "The current release features our staged testis atlas, with developmental time-course and spatial transcription datasets coming soon"),
+            p(tags$strong("Feedback:")),
+            tags$ul(
+              tags$li("adamward.bio@gmail for database developer related questions"),
+              tags$li("hayden.mcswiggin@wsu.edu for database/paper science questions")
+            )
         )
       ),
       column(
@@ -811,13 +841,12 @@ navbarPage(
               tags$li("Pick a figure type and set filters (genes, stages, cell groups)."),
               tags$li("Customize aesthetics and download your figure.")
             ),
-            div(
-              class = "tutorial-btn-wrap",
-              actionButton(
-                inputId = "open_tutorial",
-                label = "Read Extended Tutorial",
-                class = "btn btn-primary btn-sm tutorial-btn"
-              )
+            p(em("You can return here anytime from the “Home” tab.")),
+            actionButton(
+              inputId = "extended_tutorial_btn",
+              label = "Extended Tutorial",
+              class = "btn btn-primary btn-sm",
+              style = "margin-top: 6px;"
             )
         )
       )
@@ -845,7 +874,7 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "Staged_Testis_Icon.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview fit-contain",
                       loading = "lazy",
                       alt = "Preview of the staged testis UMAP embeddings"
                     ),
@@ -936,7 +965,7 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "Sertoli_Subset_Icon.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview fit-contain",
                       loading = "lazy",
                       alt = "Preview of Sertoli subset"
                     ),
@@ -958,7 +987,7 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "Spermatogonia_Subset_Icon.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview fit-contain",
                       loading = "lazy",
                       alt = "Preview of Spermatogonia subset"
                     ),
@@ -980,7 +1009,7 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "Spermatocyte_Subset_Icon.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview fit-contain",
                       loading = "lazy",
                       alt = "Preview of Spermatocyte subset"
                     ),
@@ -1002,7 +1031,7 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "Spermatid_Subset_Icon.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview fit-contain",
                       loading = "lazy",
                       alt = "Preview of Spermatid subset"
                     ),
@@ -1280,7 +1309,7 @@ navbarMenu(
           style = "padding:12px; border-radius:12px;",
           shinycssloaders::withSpinner(
             uiOutput("spermatogonia_svg"),
-            type = 3,
+            type = 8,
             color = "#4F46E5",
             color.background = "transparent",
             proxy.height = "720px"
@@ -1292,7 +1321,8 @@ navbarMenu(
           a("https://dx.doi.org/10.3791/61800", href = "https://dx.doi.org/10.3791/61800", target = "_blank")
         )
       )
-    )
+    ),
+    make_interactive_explanation_box()
   ),
   
   # ==========================================
@@ -1343,7 +1373,16 @@ navbarMenu(
             class = "ra-head-main",
             tags$h3(class = "ra-title", "DotPlot")
           ),
-          tags$p(class = "ra-sub", "Expression of selected RA genes across chosen cell types.")
+          tags$p(class = "ra-sub", "Expression of selected RA genes across chosen cell types."),
+          tags$div(
+            class = "ra-reload-wrap",
+            actionButton(
+              inputId = "ra_dot_refresh",
+              label = "Reload Figure",
+              class = "ra-btn reload-btn no-snapshot",
+              title = "Refresh plot"
+            )
+          )
         ),
         tags$div(
           class = "ra-card-download",
@@ -1374,7 +1413,7 @@ navbarMenu(
           style = "padding:12px; border-radius:12px;",
           shinycssloaders::withSpinner(
             plotOutput("ra_dotplot", height = "750px", width = "100%"),
-            type = 3,
+            type = 8,
             color = "#4F46E5",
             color.background = "transparent",
             proxy.height = "750px"
@@ -1382,6 +1421,7 @@ navbarMenu(
         )
       )
     ),
+    make_interactive_explanation_box(),
 
     tags$hr(class = "ra-divider"),
 
@@ -1442,7 +1482,16 @@ navbarMenu(
             class = "ra-head-main",
             tags$h3(class = "ra-title", "LinePlot")
           ),
-          tags$p(class = "ra-sub", "Expression trajectories of selected genes across stages.")
+          tags$p(class = "ra-sub", "Expression trajectories of selected genes across stages."),
+          tags$div(
+            class = "ra-reload-wrap",
+            actionButton(
+              inputId = "ra_line_refresh",
+              label = "Reload Figure",
+              class = "ra-btn reload-btn no-snapshot",
+              title = "Refresh plot"
+            )
+          )
         ),
         tags$div(
           class = "ra-card-download",
@@ -1473,14 +1522,15 @@ navbarMenu(
           style = "padding:12px; border-radius:12px;",
           shinycssloaders::withSpinner(
             plotOutput("ra_lineplot", height = "750px", width = "100%"),
-            type = 3,
+            type = 8,
             color = "#4F46E5",
             color.background = "transparent",
             proxy.height = "750px"
           )
         )
       )
-    )
+    ),
+    make_interactive_explanation_box()
   ),
   
   # ============================================
@@ -1519,8 +1569,20 @@ navbarMenu(
         
         tags$div(
           class = "ra-card-head",
-          tags$h3(class = "ra-title", "Heatmap"),
-          tags$p(class = "ra-sub", "Communication scores across stages for selected LR pairs.")
+          tags$div(
+            class = "ra-head-main",
+            tags$h3(class = "ra-title", "Heatmap")
+          ),
+          tags$p(class = "ra-sub", "Communication scores across stages for selected LR pairs."),
+          tags$div(
+            class = "ra-reload-wrap",
+            actionButton(
+              inputId = "ccc_refresh",
+              label = "Reload Figure",
+              class = "ra-btn reload-btn no-snapshot",
+              title = "Refresh heatmap"
+            )
+          )
         ),
         
         # Capture container
@@ -1529,13 +1591,14 @@ navbarMenu(
           style = "padding:12px; border-radius:12px;",
           shinycssloaders::withSpinner(
             plotlyOutput("ccc_heatmap", height = "680px", width = "100%"),
-            type = 3,
+            type = 8,
             color = "#4F46E5",
             color.background = "transparent"
           )
         )
       )
-    )
+    ),
+    make_interactive_explanation_box()
   )
 ),
 

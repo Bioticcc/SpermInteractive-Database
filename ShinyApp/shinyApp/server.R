@@ -18,6 +18,7 @@ library(RColorBrewer)
 library(plotly)
 library(dplyr)
 library(viridisLite)
+library(patchwork)
 
 source("ra_tabs.R")
 
@@ -153,6 +154,99 @@ get_ra_dot_avg <- lazy_rds_loader(c("ra_dot_avg_expr.rds"))
 get_ra_dot_pct <- lazy_rds_loader(c("ra_dot_pct_expr.rds"))
 get_ra_line_mean <- lazy_rds_loader(c("ra_line_mean_expr.rds"))
 get_interactive_genes <- lazy_rds_loader(c("interactive_genes.rds"))
+
+# Developer-only parity check between precomputed RA line assets and a direct
+# summary from specificCellID object. This is never called in normal runtime.
+dev_check_ra_line <- function(
+  genes = c("Stra8", "Stra6", "Aldh1a1", "Aldh1a2", "Aldh1a3"),
+  enable = getOption("dev_mode_ra_check", FALSE),
+  specific_paths = c("specificCellID_slim.rds", "specificCellID.rds")
+) {
+  if (!isTRUE(enable)) {
+    return(invisible(NULL))
+  }
+
+  line_mean <- get_ra_line_mean()
+  keep_genes <- intersect(genes, dimnames(line_mean)[[1]])
+  if (!length(keep_genes)) {
+    message("[dev_check_ra_line] No requested genes found in ra_line_mean_expr.rds")
+    return(invisible(NULL))
+  }
+
+  asset_df <- as.data.frame(as.table(line_mean[keep_genes, , , drop = FALSE]))
+  colnames(asset_df) <- c("gene", "sample", "generalCellID", "mean_z_asset")
+  asset_df$generalCellID <- as.character(asset_df$generalCellID)
+  asset_df$generalCellID[asset_df$generalCellID == "Somatic"] <- "Sertoli"
+  asset_df <- asset_df[, c("gene", "sample", "generalCellID", "mean_z_asset"), drop = FALSE]
+
+  specific_path <- specific_paths[file.exists(specific_paths)][1]
+  if (is.na(specific_path) || !nzchar(specific_path)) {
+    message("[dev_check_ra_line] specificCellID .rds not found; skipping direct comparison")
+    return(invisible(asset_df))
+  }
+
+  obj <- readRDS(specific_path)
+  meta <- obj@meta.data
+  required_cols <- c("sample", "generalCellID")
+  missing_cols <- setdiff(required_cols, colnames(meta))
+  if (length(missing_cols)) {
+    message(sprintf(
+      "[dev_check_ra_line] Missing meta columns in %s: %s",
+      basename(specific_path), paste(missing_cols, collapse = ", ")
+    ))
+    return(invisible(asset_df))
+  }
+
+  fetch_vars <- unique(c(keep_genes, "sample", "generalCellID"))
+  direct <- Seurat::FetchData(obj, vars = fetch_vars)
+  direct$cell <- rownames(direct)
+  direct$sample <- as.character(direct$sample)
+  direct$generalCellID <- as.character(direct$generalCellID)
+  direct$generalCellID[direct$generalCellID == "Somatic"] <- "Sertoli"
+
+  long_direct <- do.call(
+    rbind,
+    lapply(keep_genes, function(gene_name) {
+      data.frame(
+        gene = gene_name,
+        sample = direct$sample,
+        generalCellID = direct$generalCellID,
+        value = as.numeric(direct[[gene_name]]),
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+
+  direct_df <- long_direct %>%
+    dplyr::group_by(gene, sample, generalCellID) %>%
+    dplyr::summarise(
+      mean_z_direct = mean(value, na.rm = TRUE),
+      n_cells = dplyr::n(),
+      .groups = "drop"
+    )
+
+  cmp <- dplyr::full_join(
+    direct_df,
+    asset_df,
+    by = c("gene", "sample", "generalCellID")
+  ) %>%
+    dplyr::mutate(abs_diff = abs(mean_z_direct - mean_z_asset))
+
+  cmp$abs_diff[is.na(cmp$abs_diff)] <- Inf
+  max_diff <- cmp %>%
+    dplyr::group_by(gene, generalCellID, sample) %>%
+    dplyr::summarise(
+      max_abs_diff = max(abs_diff),
+      n_cells = ifelse(all(is.na(n_cells)), NA_integer_, max(n_cells, na.rm = TRUE)),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(dplyr::desc(max_abs_diff), gene, generalCellID, sample)
+
+  message("[dev_check_ra_line] Max absolute difference by (gene, cell type, stage):")
+  print(max_diff)
+  message(sprintf("[dev_check_ra_line] overall max abs diff: %.6f", max(max_diff$max_abs_diff, na.rm = TRUE)))
+  invisible(cmp)
+}
 
 source("button_mapping_general.R")   # This is the general mapping
 
@@ -979,8 +1073,20 @@ shinyServer(function(input, output, session) {
     ra_dotplot = FALSE,
     ra_lineplot = FALSE
   )
+  ra_dot_tick  <- reactiveVal(1)  # auto render once
+  ra_line_tick <- reactiveVal(1)
+  ccc_tick     <- reactiveVal(1)
+  ra_line_dev_checked <- reactiveVal(FALSE)
+  startup_reload_retries <- reactiveValues(
+    retinoic_acid = 0L,
+    cell2cell_heatmaps = 0L
+  )
 
-  open_ra_gate <- function(name, delay = 1) {
+  open_ra_gate <- function(name, delay = 0) {
+    if (isTRUE(delay <= 0)) {
+      ra_plot_gate[[name]] <- TRUE
+      return(invisible(NULL))
+    }
     ra_plot_gate[[name]] <- FALSE
     later::later(function() {
       ra_plot_gate[[name]] <- TRUE
@@ -988,8 +1094,16 @@ shinyServer(function(input, output, session) {
   }
 
   update_ra_gene_inputs <- function(genes) {
-    default_genes <- c("Stra8", "Stra6", "Aldh1a1", "Aldh1a2", "Cyp26a1", "Rxra")
-    default_genes <- default_genes[default_genes %in% genes]
+    desired_genes <- rev(c(
+      "Stra8", "Stra6",
+      "Aldh1a1", "Aldh1a2", "Aldh1a3",
+      "Cyp26a1", "Cyp26b1", "Cyp26c1",
+      "Rara", "Rarb", "Rarg",
+      "Rxra", "Rxrb", "Rxrg",
+      "Dmrt1", "Rdh10", "Rbp4", "Rbp1"
+    ))
+    default_genes <- desired_genes[desired_genes %in% genes]
+    ordered_choices <- c(default_genes, setdiff(genes, default_genes))
     selected <- input$ra_genes
     if (is.null(selected) || !length(selected)) {
       selected <- default_genes
@@ -1000,16 +1114,27 @@ shinyServer(function(input, output, session) {
     updateSelectizeInput(
       session,
       "ra_genes",
-      choices = genes,
+      choices = ordered_choices,
       selected = selected,
       server = TRUE
     )
   }
 
   update_ra_celltype_inputs <- function(cell_types) {
+    desired_cell_types <- c(
+      "Aund", "A1-2", "A3-4", "Ain", "Type B",
+      "ePL", "lPL", "L", "L/Z", "Z",
+      "PaI-VI", "PaVII-VIII", "PaIX-X", "D/MI",
+      "Rd1", "Rd2-3", "Rd4-5", "Rd6", "Rd7", "Rd8",
+      "El9", "El10", "El11", "El12-13", "El14-15", "El16",
+      "SC_I-VIII", "SC_VII-VIII", "SC_IX-XII", "SC_XI-VI", "SC_All_Stages",
+      "PTM", "Leydig", "Macrophage"
+    )
+    ordered_choices <- c(desired_cell_types[desired_cell_types %in% cell_types],
+                         setdiff(cell_types, desired_cell_types))
     selected <- input$ra_cell_types
     if (is.null(selected) || !length(selected)) {
-      selected <- cell_types
+      selected <- ordered_choices
     }
     if (!is.null(initial_query[["ra_cell_types"]])) {
       selected <- decode_query_value(initial_query[["ra_cell_types"]])
@@ -1017,15 +1142,15 @@ shinyServer(function(input, output, session) {
     updateCheckboxGroupInput(
       session,
       "ra_cell_types",
-      choices = cell_types,
+      choices = ordered_choices,
       selected = selected
     )
   }
 
   update_ra_line_inputs <- function(genes) {
     default_genes_row1 <- c("Stra8", "Stra6")
-    default_genes_row2 <- c("Aldh1a1", "Aldh1a2")
-    default_genes_row3 <- c("Cyp26a1", "Rxra")
+    default_genes_row2 <- c("Aldh1a1", "Aldh1a2", "Aldh1a3")
+    default_genes_row3 <- c("Cyp26a1", "Cyp26b1", "Cyp26c1")
 
     default_genes_row1 <- default_genes_row1[default_genes_row1 %in% genes]
     default_genes_row2 <- default_genes_row2[default_genes_row2 %in% genes]
@@ -1110,6 +1235,10 @@ shinyServer(function(input, output, session) {
       }
       ra_assets_ready$line <- TRUE
     }
+    if (isTRUE(getOption("dev_mode_ra_check", FALSE)) && !isTRUE(ra_line_dev_checked())) {
+      dev_check_ra_line()
+      ra_line_dev_checked(TRUE)
+    }
     genes <- get_interactive_genes()
     update_ra_line_inputs(genes)
     TRUE
@@ -1127,9 +1256,26 @@ shinyServer(function(input, output, session) {
         ensure_line_assets()
         open_ra_gate("ra_dotplot")
         open_ra_gate("ra_lineplot")
+        ra_dot_tick(ra_dot_tick() + 1)
+        ra_line_tick(ra_line_tick() + 1)
+        startup_reload_retries$retinoic_acid <- 4L
       }
     }
   }, ignoreNULL = TRUE)
+
+  observe({
+    attempts_left <- startup_reload_retries$retinoic_acid
+    if (attempts_left <= 0L || !identical(input$mainTabs, "retinoic_acid")) return()
+    invalidateLater(1400, session)
+    ensure_dot_assets(show_progress = FALSE)
+    ensure_line_assets(show_progress = FALSE)
+    # Keep the gates open during startup retries so one successful paint is guaranteed.
+    ra_plot_gate$ra_dotplot <- TRUE
+    ra_plot_gate$ra_lineplot <- TRUE
+    ra_dot_tick(ra_dot_tick() + 1)
+    ra_line_tick(ra_line_tick() + 1)
+    startup_reload_retries$retinoic_acid <- attempts_left - 1L
+  })
 
   observeEvent(input$preset_copy_notice, {
     msg <- input$preset_copy_notice$message
@@ -1171,6 +1317,40 @@ shinyServer(function(input, output, session) {
   encode_query_value <- function(value) paste(value, collapse = ",")
   decode_query_value <- function(value) strsplit(value, ",", fixed = TRUE)[[1]]
   initial_query <- isolate(parseQueryString(session$clientData$url_search))
+
+  # Exclude transient controls/events from bookmarked links.
+  setBookmarkExclude(c(
+    "copy_view_link",
+    "preset_copy_notice",
+    "home_card_nav",
+    "btn_click",
+    "modalClosedBtn",
+    "__modal__closed__",
+    "gene_search_btn",
+    "extended_tutorial_btn"
+  ))
+
+  observeEvent(input$copy_view_link, {
+    tryCatch(
+      session$doBookmark(),
+      error = function(e) {
+        showNotification(
+          sprintf("Unable to build share link: %s", conditionMessage(e)),
+          type = "error",
+          duration = 5
+        )
+      }
+    )
+  }, ignoreInit = TRUE)
+
+  onBookmarked(function(url) {
+    tab_value <- isolate(input$mainTabs)
+    shared_url <- sub("#.*$", "", url)
+    if (!is.null(tab_value) && nzchar(tab_value)) {
+      shared_url <- paste0(shared_url, "#", utils::URLencode(tab_value, reserved = TRUE))
+    }
+    session$sendCustomMessage("copy-to-clipboard", list(text = shared_url))
+  })
 
 #   user_upload <- reactiveValues(
 #     temp_dir = NULL,
@@ -2276,19 +2456,21 @@ shinyServer(function(input, output, session) {
     updateNavbarPage(session, "mainTabs", selected = input$home_card_nav)
     session$sendCustomMessage("close-nav-dropdown", list(target = input$home_card_nav, delay = 280))
   })
-  observeEvent(input$open_tutorial, {
-    # open a blank placeholder page in-app without adding to navbar
-    showModal(modalDialog(
-      title = "Extended Tutorial (coming soon)",
-      "A full walkthrough will appear here in a future update.",
-      easyClose = TRUE,
-      footer = modalButton("Close")
-    ))
+
+  observeEvent(input$extended_tutorial_btn, {
+    showModal(
+      modalDialog(
+        title = "Extended Tutorial",
+        "Tutorial in progress",
+        easyClose = TRUE,
+        footer = modalButton("Close")
+      )
+    )
   })
 
   bind_main_figures <- function(prefix, get_conf, get_meta) {
     make_id <- function(part) paste0(prefix, "mf", part)
-    target_ui <- "specificCellID.1"
+    target_ui <- "correct_cellTypes"
 
     get_groups <- function() {
       conf <- get_conf()
@@ -2329,7 +2511,8 @@ shinyServer(function(input, output, session) {
       if (is.null(pt_size) || !is.finite(pt_size)) {
         pt_size <- 2.5
       }
-      with_dark(
+      show_labels <- isTRUE(input[[make_id("labels")]])
+      p <- with_dark(
         scDRcell,
         get_conf(),
         get_meta(),
@@ -2344,13 +2527,27 @@ shinyServer(function(input, output, session) {
         "Medium",
         "Square",
         FALSE,               # show axis text
-        TRUE,                # show labels
+        show_labels,         # show labels
         stage_split = FALSE
       )
+      p +
+        ggplot2::theme(
+          legend.position = "right",
+          legend.direction = "vertical"
+        ) +
+        ggplot2::guides(
+          color = ggplot2::guide_legend(
+            ncol = 1,
+            byrow = FALSE,
+            override.aes = list(size = 4)
+          ),
+          fill = "none"
+        )
     })
     outputOptions(output, make_id("main"), suspendWhenHidden = TRUE)
 
     output[[make_id("split")]] <- renderPlot({
+      show_labels <- isTRUE(input[[make_id("labels")]])
       p <- with_dark(
         scDRcell,
         get_conf(),
@@ -2366,7 +2563,7 @@ shinyServer(function(input, output, session) {
         "Small",
         "Square",
         FALSE,
-        TRUE,
+        show_labels,
         stage_split = TRUE,
         stage_facet_ncol = 4
       )
@@ -5286,6 +5483,8 @@ shinyServer(function(input, output, session) {
     top_genes     <- head(sorted_genes, 50)
     gene_vector   <- names(top_genes)
     all_filtered_genes <- names(filtered_expr)
+    all_gene_expr <- as.list(as.numeric(filtered_expr))
+    names(all_gene_expr) <- names(filtered_expr)
     top_gene <- if (length(gene_vector)) gene_vector[1] else "(none)"
     
     # IDs for modal elements
@@ -5299,6 +5498,7 @@ shinyServer(function(input, output, session) {
       "(function(){",
       "  var allGenes = ", jsonlite::toJSON(all_filtered_genes, auto_unbox = TRUE), ";",
       "  var topGenes = ", jsonlite::toJSON(unname(gene_vector), auto_unbox = TRUE), ";",
+      "  var geneExpr = ", jsonlite::toJSON(all_gene_expr, auto_unbox = TRUE), ";",
       "  var searchId = ", shQuote(search_id), ";",
       "  var resultId = ", shQuote(paste0("searchResult_", btn_id)), ";",
       "  var listId   = ", shQuote(list_id), ";",
@@ -5306,18 +5506,23 @@ shinyServer(function(input, output, session) {
       "  var resultDiv   = document.getElementById(resultId);",
       "  var geneListDiv = document.getElementById(listId);",
       "  function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&'); }",
+      "  function formatGeneLine(g){",
+      "    var v = geneExpr[g];",
+      "    if (typeof v !== 'number' || !isFinite(v)) return g + ', expression: NA';",
+      "    return g + ', expression: ' + v.toFixed(3);",
+      "  }",
       "  if (!searchInput || !resultDiv || !geneListDiv) return;",
       "  searchInput.addEventListener('input', function(){",
       "    var s = this.value.trim().toLowerCase();",
       "    if (s === '') {",
-      "      geneListDiv.innerHTML = topGenes.join('<br>');",
+      "      geneListDiv.innerHTML = topGenes.map(formatGeneLine).join('<br>');",
       "      resultDiv.innerHTML   = '';",
       "      return;",
       "    }",
       "    var matches = allGenes.filter(function(g){ return g.toLowerCase().indexOf(s) > -1; });",
       "    if (matches.length > 0){",
       "      var rx = new RegExp('(' + escapeRegex(s) + ')','gi');",
-      "      var highlighted = matches.map(function(g){ return g.replace(rx, '<mark>$1</mark>'); });",
+      "      var highlighted = matches.map(function(g){ return formatGeneLine(g).replace(rx, '<mark>$1</mark>'); });",
       "      geneListDiv.innerHTML = highlighted.slice(0, 100).join('<br>');",
       "      resultDiv.innerHTML   = matches.length + ' gene(s) found' + (matches.length > 100 ? ' (showing first 100)' : '');",
       "    } else {",
@@ -5352,7 +5557,10 @@ shinyServer(function(input, output, session) {
       tags$div(
         id = list_id,
         class = "spg-modal-gene-list",
-        if (length(gene_vector)) HTML(paste(gene_vector, collapse = "<br>"))
+        if (length(top_genes)) {
+          top_lines <- sprintf("%s, expression: %.3f", names(top_genes), as.numeric(top_genes))
+          HTML(paste(top_lines, collapse = "<br>"))
+        }
         else tags$em("No genes above threshold at the current cutoff.")
       ),
       tags$script(HTML(js_code))
@@ -5508,12 +5716,52 @@ shinyServer(function(input, output, session) {
   
   # --- Figure 5A: RA DotPlot (returns ggplot) ---
   make_fig5A <- function(pub_theme = FALSE, dark_theme = FALSE){
-    req(input$ra_genes, input$ra_cell_types)
     avg <- get_ra_dot_avg()
     pct <- get_ra_dot_pct()
 
-    genes <- intersect(input$ra_genes, rownames(avg))
-    cell_types <- intersect(input$ra_cell_types, colnames(avg))
+    desired_genes_order <- rev(c(
+      "Stra8", "Stra6",
+      "Aldh1a1", "Aldh1a2", "Aldh1a3",
+      "Cyp26a1", "Cyp26b1", "Cyp26c1",
+      "Rara", "Rarb", "Rarg",
+      "Rxra", "Rxrb", "Rxrg",
+      "Dmrt1", "Rdh10", "Rbp4", "Rbp1"
+    ))
+    default_genes <- desired_genes_order[desired_genes_order %in% rownames(avg)]
+    selected_genes <- input$ra_genes
+    if (is.null(selected_genes) || !length(selected_genes)) {
+      selected_genes <- default_genes
+    }
+    selected_genes <- selected_genes[selected_genes %in% rownames(avg)]
+    if (!length(selected_genes)) {
+      selected_genes <- rownames(avg)
+    }
+    extras <- setdiff(selected_genes, desired_genes_order)
+    genes <- c(desired_genes_order[desired_genes_order %in% selected_genes], extras)
+    desired_cell_types <- c(
+      "Aund", "A1-2", "A3-4", "Ain", "Type B",
+      "ePL", "lPL", "L", "L/Z", "Z",
+      "PaI-VI", "PaVII-VIII", "PaIX-X", "D/MI",
+      "Rd1", "Rd2-3", "Rd4-5", "Rd6", "Rd7", "Rd8",
+      "El9", "El10", "El11", "El12-13", "El14-15", "El16",
+      "SC_I-VIII", "SC_VII-VIII", "SC_IX-XII", "SC_XI-VI", "SC_All_Stages",
+      "PTM", "Leydig", "Macrophage"
+    )
+    selected_cell_types <- input$ra_cell_types
+    if (is.null(selected_cell_types) || !length(selected_cell_types)) {
+      selected_cell_types <- colnames(avg)
+    }
+    # Accept the figure shorthand MO as an alias for Macrophage.
+    selected_cell_types[selected_cell_types == "M\330"] <- "Macrophage"
+    selected_cell_types <- unique(selected_cell_types)
+    selected_cell_types <- selected_cell_types[selected_cell_types %in% colnames(avg)]
+    cell_types <- c(
+      desired_cell_types[desired_cell_types %in% selected_cell_types],
+      setdiff(selected_cell_types, desired_cell_types)
+    )
+    if (!length(cell_types)) {
+      cell_types <- colnames(avg)
+    }
     if (!length(genes) || !length(cell_types)) {
       return(
         ggplot() +
@@ -5544,8 +5792,10 @@ shinyServer(function(input, output, session) {
     df$avg.exp.scaled <- as.vector(scaled)
     df$pct.exp <- as.vector(pct_sub)
 
-    # tri-tone app palette
-    themed_bvt <- c("#93c5fd", "#a78bfa", "#34d399")
+    # Match publication Figure 5A palette (RA_Signaling_Figure5)
+    publication_rd_bu <- rev(
+      grDevices::colorRampPalette(RColorBrewer::brewer.pal(9, "RdBu"))(100)
+    )
 
     axis_col <- if (dark_theme) "#e2e8f0" else "#1e293b"
     grid_col <- if (dark_theme) "#1f2937" else "#e5e7eb"
@@ -5559,7 +5809,7 @@ shinyServer(function(input, output, session) {
         shape = 21, stroke = 0.3, color = point_stroke
       ) +
       scale_fill_gradientn(
-        colors = themed_bvt,
+        colors = publication_rd_bu,
         values = scales::rescale(c(-2.5, 0, 2.5)),
         limits = c(-2.5, 2.5),
         oob    = scales::squish
@@ -5571,7 +5821,7 @@ shinyServer(function(input, output, session) {
         plot.background = element_rect(fill = bg_col, colour = NA),
         panel.grid.major = element_line(color = grid_col),
         panel.grid.minor = element_line(color = grid_col),
-        axis.text.x = element_text(color = axis_col, size = 10, angle = 90, hjust = 1, vjust = 0.5),
+        axis.text.x = element_text(color = axis_col, size = 10, angle = 45, hjust = 1, vjust = 1),
         axis.text.y = element_text(color = axis_col, size = 10),
         axis.title.x = element_blank(),
         axis.title.y = element_blank(),
@@ -5593,13 +5843,27 @@ shinyServer(function(input, output, session) {
     p
   }
   
-  # --- Figure 5C: RA LinePlot (returns ggplot) ---
-  make_fig5C <- function(pub_theme = FALSE, dark_theme = FALSE){
-    req(input$ra_line_genes_row1, input$ra_line_genes_row2, input$ra_line_genes_row3)
-
+  # --- Figure 5C: RA LinePlot (returns ggplot/patchwork) ---
+  make_fig5C <- function(pub_theme = TRUE, dark_theme = FALSE, pub_layout = TRUE){
     line_mean <- get_ra_line_mean()
-    all_genes <- unique(c(input$ra_line_genes_row1, input$ra_line_genes_row2, input$ra_line_genes_row3))
+    row1_genes <- input$ra_line_genes_row1
+    row2_genes <- input$ra_line_genes_row2
+    row3_genes <- input$ra_line_genes_row3
+    if (is.null(row1_genes) || !length(row1_genes)) row1_genes <- c("Stra8", "Stra6")
+    if (is.null(row2_genes) || !length(row2_genes)) row2_genes <- c("Aldh1a1", "Aldh1a2", "Aldh1a3")
+    if (is.null(row3_genes) || !length(row3_genes)) row3_genes <- c("Cyp26a1", "Cyp26b1", "Cyp26c1")
+    all_genes <- unique(c(row1_genes, row2_genes, row3_genes))
     genes <- intersect(all_genes, dimnames(line_mean)[[1]])
+    stage_levels <- c(
+      "I-VI (Weak to Strong)",
+      "VII-VIII (Dark)",
+      "IX-X (Pale)",
+      "XI-XII (Pale to Weak)"
+    )
+    stage_levels_with_loop <- c(stage_levels, "I-VI (looped)")
+    stage_label_short <- function(values) {
+      sub("\\s*\\(.*\\)", "", as.character(values))
+    }
 
     if (!length(genes)) {
       return(
@@ -5612,6 +5876,10 @@ shinyServer(function(input, output, session) {
     df_summary <- as.data.frame(as.table(line_mean[genes, , , drop = FALSE]))
     colnames(df_summary) <- c("gene", "sample", "generalCellID", "mean_z")
     df_summary$mean_z <- as.numeric(df_summary$mean_z)
+    df_summary$sample <- as.character(df_summary$sample)
+    df_summary$generalCellID <- as.character(df_summary$generalCellID)
+    df_summary$generalCellID[df_summary$generalCellID == "Somatic"] <- "Sertoli"
+    df_summary <- df_summary[df_summary$sample %in% stage_levels, , drop = FALSE]
     df_summary <- df_summary[is.finite(df_summary$mean_z), , drop = FALSE]
     if (!nrow(df_summary)) {
       return(
@@ -5620,23 +5888,18 @@ shinyServer(function(input, output, session) {
           annotate("text", x = 0, y = 0, label = "No data available for selected genes")
       )
     }
-    
+
     df_looped <- df_summary %>%
       dplyr::filter(sample == "I-VI (Weak to Strong)") %>%
       dplyr::mutate(sample = "I-VI (looped)")
-    
+
     df_summary_looped <- dplyr::bind_rows(df_summary, df_looped)
-    
-    df_summary_looped$stage <- dplyr::case_when(
-      df_summary_looped$sample == "I-VI (Weak to Strong)" ~ "I-VI",
-      df_summary_looped$sample == "VII-VIII (Dark)" ~ "VII-VIII",
-      df_summary_looped$sample == "IX-X (Pale)" ~ "IX-X",
-      df_summary_looped$sample == "XI-XII (Pale to Weak)" ~ "XI-XII",
-      df_summary_looped$sample == "I-VI (looped)" ~ "I-VI",
-      TRUE ~ as.character(df_summary_looped$sample)
+
+    df_summary_looped$sample <- factor(
+      df_summary_looped$sample,
+      levels = stage_levels_with_loop
     )
-    df_summary_looped$stage <- factor(df_summary_looped$stage, levels = c("I-VI","VII-VIII","IX-X","XI-XII"))
-    
+
     scale_vec <- function(x) {
       if (length(unique(x)) <= 1) {
         return(rep(0, length(x)))
@@ -5648,20 +5911,93 @@ shinyServer(function(input, output, session) {
       dplyr::group_by(gene, generalCellID) %>%
       dplyr::mutate(scaled_expr = scale_vec(mean_z)) %>%
       dplyr::ungroup()
-    
-    df_rescaled$plot_row <- dplyr::case_when(
-      df_rescaled$gene %in% input$ra_line_genes_row1 ~ "Row 1",
-      df_rescaled$gene %in% input$ra_line_genes_row2 ~ "Row 2",
-      df_rescaled$gene %in% input$ra_line_genes_row3 ~ "Row 3"
+    desired_cols <- c("Spermatogonia", "Spermatocyte", "Round Spermatid", "Elongating Spermatid", "Sertoli")
+    df_rescaled$generalCellID <- factor(
+      df_rescaled$generalCellID,
+      levels = c(desired_cols, setdiff(unique(df_rescaled$generalCellID), desired_cols))
     )
-    df_rescaled$plot_row <- factor(df_rescaled$plot_row, levels = c("Row 1","Row 2","Row 3"))
-    
+
+    df_rescaled$plot_row <- dplyr::case_when(
+      df_rescaled$gene %in% row1_genes ~ "Row 1",
+      df_rescaled$gene %in% row2_genes ~ "Row 2",
+      df_rescaled$gene %in% row3_genes ~ "Row 3"
+    )
+    df_rescaled$plot_row <- factor(df_rescaled$plot_row, levels = c("Row 1", "Row 2", "Row 3"))
+    df_rescaled$n_cells <- NA_integer_
+
+    pal_manual <- c(
+      "Stra8"   = "#1F78B4",
+      "Stra6"   = "#A6CEE3",
+      "Aldh1a1" = "#B2DF8A",
+      "Aldh1a2" = "#33A02C",
+      "Aldh1a3" = "#1D6914",
+      "Cyp26a1" = "#FB9A99",
+      "Cyp26b1" = "#E31A1C",
+      "Cyp26c1" = "#FF7F00"
+    )
+    pal_use <- pal_manual[intersect(names(pal_manual), unique(df_rescaled$gene))]
+    extra_genes <- setdiff(unique(df_rescaled$gene), names(pal_use))
+    if (length(extra_genes)) {
+      pal_use <- c(pal_use, setNames(scales::hue_pal()(length(extra_genes)), extra_genes))
+    }
+
     axis_col <- if (dark_theme) "#e2e8f0" else "#1e293b"
     grid_col <- if (dark_theme) "#1f2937" else "grey85"
     bg_col   <- if (dark_theme) "#050815" else "#ffffff"
     strip_bg <- if (dark_theme) "#0f172a" else "grey92"
 
-    p <- ggplot(df_rescaled, aes(x = stage, y = scaled_expr, color = gene, group = gene)) +
+    base_size <- if (pub_theme) 6 else 12
+
+    build_row_plot <- function(row_name, show_x = FALSE) {
+      df_row <- dplyr::filter(df_rescaled, plot_row == row_name)
+      x_text <- if (show_x) {
+        element_text(angle = 45, hjust = 1, color = axis_col, size = base_size * 1.1)
+      } else {
+        element_blank()
+      }
+      ggplot(df_row, aes(x = sample, y = scaled_expr, color = gene, group = gene,
+                         text = sprintf(
+                           "Gene: %s<br>Cell: %s<br>Stage: %s<br>Scaled: %.3f<br>Mean: %.3f<br>N cells: %s",
+                           gene, generalCellID, as.character(sample), scaled_expr, mean_z,
+                           ifelse(is.na(n_cells), "N/A", as.character(n_cells))
+                         ))) +
+        geom_line(linewidth = 0.5) +
+        geom_point(size = 1.5) +
+        facet_wrap(~ generalCellID, nrow = 1, scales = "fixed") +
+        coord_cartesian(ylim = c(-2, 2)) +
+        theme_minimal(base_size = base_size) +
+        labs(x = NULL, y = NULL) +
+        theme(
+          panel.background = element_rect(fill = bg_col, colour = NA),
+          plot.background = element_rect(fill = bg_col, colour = NA),
+          panel.grid.major = element_line(color = grid_col),
+          panel.grid.minor = element_blank(),
+          axis.text.x = x_text,
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.ticks.x = if (show_x) element_line(color = axis_col, linewidth = 0.2) else element_blank(),
+          strip.background = element_rect(fill = strip_bg, colour = NA),
+          strip.text = element_blank(),
+          legend.position = "none",
+          plot.margin = unit(c(0.5,0.5,0.5,0.5), "lines")
+        ) +
+        scale_x_discrete(drop = FALSE, labels = stage_label_short) +
+        scale_color_manual(values = pal_use)
+    }
+
+    if (isTRUE(pub_layout)) {
+      rows <- levels(df_rescaled$plot_row)
+      plots <- lapply(seq_along(rows), function(i) build_row_plot(rows[[i]], show_x = i == length(rows)))
+      return(patchwork::wrap_plots(plots, ncol = 1, guides = "collect") &
+               theme(legend.position = "right",
+                     legend.background = element_rect(fill = bg_col, colour = NA),
+                     legend.text = element_text(color = axis_col),
+                     legend.title = element_text(color = axis_col)))
+    }
+
+    ggplot(df_rescaled, aes(x = sample, y = scaled_expr, color = gene, group = gene,
+                            text = sprintf("Gene: %s<br>Cell: %s<br>Stage: %s<br>Scaled: %.2f<br>Mean: %.2f",
+                                           gene, generalCellID, sample, scaled_expr, mean_z))) +
       geom_line(linewidth = if (pub_theme) 0.4 else 0.5) +
       geom_point(size = if (pub_theme) 1.2 else 1.5) +
       facet_grid(plot_row ~ generalCellID, scales = "fixed") +
@@ -5684,15 +6020,28 @@ shinyServer(function(input, output, session) {
         legend.background = element_rect(fill = bg_col, colour = NA),
         legend.text = element_text(color = axis_col),
         legend.title = element_text(color = axis_col)
-      )
-    
-    p
+      ) +
+      scale_x_discrete(drop = FALSE, labels = stage_label_short) +
+      scale_color_manual(values = pal_use, guide = guide_legend(override.aes = list(size = 3)))
   }
   
   # DotPlot rendering for Figure 5A (replace whole body with this)
-  output$ra_dotplot <- renderPlot({
+  observeEvent(input$ra_dot_refresh, {
+    ra_dot_tick(ra_dot_tick() + 1)
+  })
+  observeEvent(debounce(reactive({
+    list(input$ra_genes, input$ra_cell_types, is_dark_mode())
+  }), 2000), {
+    ra_dot_tick(ra_dot_tick() + 1)
+  }, ignoreInit = TRUE)
+
+  ra_dotplot_event <- eventReactive(ra_dot_tick(), {
     req(ra_plot_gate$ra_dotplot)
     make_fig5A(pub_theme = FALSE, dark_theme = is_dark_mode())
+  }, ignoreNULL = FALSE)
+
+  output$ra_dotplot <- renderPlot({
+    ra_dotplot_event()
   }, res = 96)
   outputOptions(output, "ra_dotplot", suspendWhenHidden = TRUE)
   
@@ -5704,9 +6053,22 @@ shinyServer(function(input, output, session) {
   
   
   # 5C Lineplot rendering (replace whole body with this)
-  output$ra_lineplot <- renderPlot({
+  observeEvent(input$ra_line_refresh, {
+    ra_line_tick(ra_line_tick() + 1)
+  })
+  observeEvent(debounce(reactive({
+    list(input$ra_line_genes_row1, input$ra_line_genes_row2, input$ra_line_genes_row3, is_dark_mode())
+  }), 2000), {
+    ra_line_tick(ra_line_tick() + 1)
+  }, ignoreInit = TRUE)
+
+  ra_lineplot_event <- eventReactive(ra_line_tick(), {
     req(ra_plot_gate$ra_lineplot)
     make_fig5C(pub_theme = FALSE, dark_theme = is_dark_mode())
+  }, ignoreNULL = FALSE)
+
+  output$ra_lineplot <- renderPlot({
+    ra_lineplot_event()
   }, res = 96)
   outputOptions(output, "ra_lineplot", suspendWhenHidden = TRUE)
   
@@ -5717,35 +6079,63 @@ shinyServer(function(input, output, session) {
     rownames(communication_score) <- communication_score$lr_pair
   }
   
-  # Update input choices
-  observe({
-    updateSelectizeInput(
-      session,
-      "ccc_lr_select",
-      choices = unique(communication_score$lr_pair),
-      selected = head(unique(communication_score$lr_pair), 10),  # or NULL
-      server = TRUE
-    )
-  })
+  ccc_default_lr <- c(
+    "FGF17_FGFR1", "FGF2_FGFR3", "FGF7_FGFR2", "FGF1_FGFR1",
+    "IGF1_IGF1R", "IGF2_IGF1R", "KITL_KIT", "GDNF_GFRA1", "NRTN_GFRA2",
+    "WNT3A_FZD7_LRP5", "WNT9A_FZD7_LRP5", "WNT8B_FZD7_LRP5", "WNT7B_FZD7_LRP5",
+    "WNT3_FZD7_LRP5", "WNT1_FZD7_LRP5", "WNT5A_FZD7", "WNT11_FZD7",
+    "DHH_PTCH1", "DLL3_NOTCH3", "DLL4_NOTCH1", "JAG2_NOTCH2", "JAG1_NOTCH1",
+    "SEMA5A_PLXNA1", "SEMA6B_PLXNA2", "SEMA6A_PLXNA4", "SEMA3C_NRP1_PLXNA1",
+    "TGFB1_TGFBR1_TGFBR2"
+  )
 
-  # If the input binding isn't ready at session start (rare with navbarMenu items),
-  # ensure a sane default selection the first time the tab is opened.
-  observeEvent(input$mainTabs, {
-    if (!identical(input$mainTabs, "cell2cell_heatmaps")) return()
+  ensure_ccc_defaults <- function() {
+    ccc_choices <- unique(communication_score[["lr_pair"]])
+    defaults <- ccc_default_lr[ccc_default_lr %in% ccc_choices]
+    if (!length(defaults)) defaults <- head(ccc_choices, 10)
     if (is.null(input$ccc_lr_select) || length(input$ccc_lr_select) == 0) {
-      ccc_choices <- unique(communication_score$lr_pair)
       updateSelectizeInput(
         session,
         "ccc_lr_select",
         choices = ccc_choices,
-        selected = head(ccc_choices, 10),
+        selected = defaults,
         server = TRUE
       )
     }
+    invisible(NULL)
+  }
+
+  # Seed defaults at startup, then keep retrying while the first heatmap renders.
+  observe({
+    ensure_ccc_defaults()
+  })
+
+  observeEvent(input$mainTabs, {
+    if (!identical(input$mainTabs, "cell2cell_heatmaps")) return()
+    ensure_ccc_defaults()
+    startup_reload_retries$cell2cell_heatmaps <- 4L
   }, ignoreNULL = TRUE)
+
+  observe({
+    attempts_left <- startup_reload_retries$cell2cell_heatmaps
+    if (attempts_left <= 0L || !identical(input$mainTabs, "cell2cell_heatmaps")) return()
+    invalidateLater(1400, session)
+    ensure_ccc_defaults()
+    ccc_tick(ccc_tick() + 1)
+    startup_reload_retries$cell2cell_heatmaps <- attempts_left - 1L
+  })
   
   # Generate heatmap
-  output$ccc_heatmap <- renderPlotly({
+  observeEvent(input$ccc_refresh, {
+    ccc_tick(ccc_tick() + 1)
+  })
+  observeEvent(debounce(reactive({
+    list(input$ccc_lr_select, is_dark_mode())
+  }), 2000), {
+    ccc_tick(ccc_tick() + 1)
+  }, ignoreInit = TRUE)
+
+  ccc_heatmap_event <- eventReactive(ccc_tick(), {
     req(input$ccc_lr_select)
     
     selected <- input$ccc_lr_select
@@ -5781,6 +6171,10 @@ shinyServer(function(input, output, session) {
         plot_bgcolor = plot_bg,
         font = list(color = axis_col)
       )
+  }, ignoreNULL = FALSE)
+
+  output$ccc_heatmap <- renderPlotly({
+    ccc_heatmap_event()
   })
   # Plotly widgets can render at an incorrect size if computed while their tab is hidden.
   # Keep the default suspend behavior so the widget renders when visible, and rely on

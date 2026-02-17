@@ -6,7 +6,18 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-seurat_path <- if (length(args) >= 1) args[[1]] else "final_staged_object_slim_nocounts.rds"
+default_seurat_candidates <- c(
+  "specificCellID_slim_nocounts.rds",
+  "specificCellID_slim.rds",
+  "specificCellID.rds",
+  "final_staged_object_slim_nocounts.rds"
+)
+seurat_path <- if (length(args) >= 1) {
+  args[[1]]
+} else {
+  pick <- default_seurat_candidates[file.exists(default_seurat_candidates)][1]
+  if (is.na(pick) || !nzchar(pick)) "final_staged_object_slim_nocounts.rds" else pick
+}
 out_dir <- if (length(args) >= 2) args[[2]] else "."
 
 if (!file.exists(seurat_path)) {
@@ -19,16 +30,106 @@ if (!dir.exists(out_dir)) {
 message(sprintf("Loading Seurat object: %s", seurat_path))
 obj <- readRDS(seurat_path)
 
-rna <- GetAssayData(obj, assay = "RNA", slot = "data")
-meta <- obj@meta.data
+read_assay_data <- function(obj, assay_name) {
+  if (!(assay_name %in% Assays(obj))) {
+    return(NULL)
+  }
+  tryCatch(
+    GetAssayData(obj, assay = assay_name, layer = "data"),
+    error = function(...) {
+      tryCatch(
+        GetAssayData(obj, assay = assay_name, slot = "data"),
+        error = function(...) NULL
+      )
+    }
+  )
+}
 
-required_cols <- c("sample", "specificCellID", "generalCellID")
+pick_assay_data <- function(obj, assay_preferences, purpose) {
+  for (assay_name in assay_preferences) {
+    mat <- read_assay_data(obj, assay_name)
+    if (!is.null(mat)) {
+      return(list(assay = assay_name, mat = mat))
+    }
+  }
+  stop(
+    sprintf(
+      "Could not read assay data for %s. Tried: %s",
+      purpose,
+      paste(assay_preferences, collapse = ", ")
+    ),
+    call. = FALSE
+  )
+}
+
+ra_assay_data <- pick_assay_data(obj, c("SCT", "RNA"), "RA assets")
+spg_assay_data <- pick_assay_data(obj, c("RNA", "SCT"), "spermatogenesis table assets")
+
+message(sprintf("Using assay '%s' for RA assets.", ra_assay_data$assay))
+message(sprintf("Using assay '%s' for spermatogenesis table assets.", spg_assay_data$assay))
+
+ra_expr <- ra_assay_data$mat
+spg_expr <- spg_assay_data$mat
+
+interactive_genes <- intersect(rownames(ra_expr), rownames(spg_expr))
+if (!length(interactive_genes)) {
+  stop("No overlapping genes between RA assay matrix and spermatogenesis assay matrix.", call. = FALSE)
+}
+
+# Keep all generated assets on the same gene set for consistent downstream indexing.
+ra_expr <- ra_expr[interactive_genes, , drop = FALSE]
+spg_expr <- spg_expr[interactive_genes, , drop = FALSE]
+
+meta <- obj@meta.data
+meta$sample <- as.character(meta$sample)
+meta$generalCellID <- as.character(meta$generalCellID)
+meta$generalCellID[meta$generalCellID == "Somatic"] <- "Sertoli"
+
+pick_specific_col <- function(meta_df) {
+  candidates <- c("specificCellID", "correct_cellTypes", "specificCellID.1")
+  available <- candidates[candidates %in% colnames(meta_df)]
+  if (!length(available)) {
+    stop(
+      sprintf(
+        "Missing specific-cell column. Need one of: %s",
+        paste(candidates, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+  non_na_counts <- vapply(
+    available,
+    function(col) sum(!is.na(meta_df[[col]]) & nzchar(as.character(meta_df[[col]]))),
+    numeric(1)
+  )
+  available[[which.max(non_na_counts)]]
+}
+
+specific_col <- pick_specific_col(meta)
+meta$specificCellID <- as.character(meta[[specific_col]])
+message(sprintf("Using '%s' for specificCellID grouping.", specific_col))
+
+required_cols <- c("sample", "generalCellID")
 missing_cols <- setdiff(required_cols, colnames(meta))
 if (length(missing_cols)) {
   stop(sprintf("Missing required meta.data columns: %s", paste(missing_cols, collapse = ", ")))
 }
 
 summarize_by_group <- function(rna_mat, groups) {
+  if (length(groups) != ncol(rna_mat)) {
+    stop("Group vector length must match number of cells in expression matrix.", call. = FALSE)
+  }
+
+  groups <- as.character(groups)
+  keep_cells <- !is.na(groups) & nzchar(groups)
+  if (!all(keep_cells)) {
+    rna_mat <- rna_mat[, keep_cells, drop = FALSE]
+    groups <- groups[keep_cells]
+  }
+  if (!length(groups)) {
+    stop("No cells left after removing NA/empty group labels.", call. = FALSE)
+  }
+
   groups <- factor(groups)
   design <- Matrix::sparse.model.matrix(~0 + groups)
   colnames(design) <- levels(groups)
@@ -60,31 +161,37 @@ summarize_by_group <- function(rna_mat, groups) {
 }
 
 # ---- Gene list (full coverage) ----
-interactive_genes <- rownames(rna)
 message(sprintf("Saving %d genes", length(interactive_genes)))
 saveRDS(interactive_genes, file.path(out_dir, "interactive_genes.rds"))
 
 # ---- RA DotPlot assets (avg + pct by active Idents) ----
-idents <- Idents(obj)
-if (is.null(idents)) {
-  stop("Active identities (Idents) are not set on the Seurat object.")
-}
+idents <- factor(meta$specificCellID, levels = unique(meta$specificCellID))
+if (!length(idents)) stop("Unable to resolve identities for RA DotPlot.", call. = FALSE)
 idents <- factor(idents, levels = levels(idents))
 message("Computing RA DotPlot summaries...")
-ra_dot <- summarize_by_group(rna, idents)
+ra_dot <- summarize_by_group(ra_expr, idents)
 saveRDS(ra_dot$avg, file.path(out_dir, "ra_dot_avg_expr.rds"))
 saveRDS(ra_dot$pct, file.path(out_dir, "ra_dot_pct_expr.rds"))
 
 # ---- RA LinePlot assets (mean by sample + generalCellID) ----
 message("Computing RA LinePlot summaries...")
-sample_levels <- unique(as.character(meta$sample))
-general_levels <- unique(as.character(meta$generalCellID))
+stage_levels_ref <- c(
+  "I-VI (Weak to Strong)",
+  "VII-VIII (Dark)",
+  "IX-X (Pale)",
+  "XI-XII (Pale to Weak)"
+)
+sample_levels <- c(stage_levels_ref[stage_levels_ref %in% unique(meta$sample)],
+                   setdiff(unique(meta$sample), stage_levels_ref))
+general_ref <- c("Spermatogonia", "Spermatocyte", "Round Spermatid", "Elongating Spermatid", "Sertoli")
+general_levels <- c(general_ref[general_ref %in% unique(meta$generalCellID)],
+                    setdiff(unique(meta$generalCellID), general_ref))
 
 sample_factor <- factor(meta$sample, levels = sample_levels)
 general_factor <- factor(meta$generalCellID, levels = general_levels)
 combo_key <- interaction(sample_factor, general_factor, drop = TRUE, sep = "__")
 
-ra_line <- summarize_by_group(rna, combo_key)
+ra_line <- summarize_by_group(ra_expr, combo_key)
 combo_levels <- ra_line$groups
 combo_parts <- strsplit(combo_levels, "__", fixed = TRUE)
 combo_sample <- vapply(combo_parts, `[`, character(1), 1)
@@ -148,7 +255,7 @@ if (!any(keep_cells)) {
 }
 
 spg_groups <- factor(meta_group_key[keep_cells], levels = unique(mapping_df$group_key))
-spg_summary <- summarize_by_group(rna[, keep_cells, drop = FALSE], spg_groups)
+spg_summary <- summarize_by_group(spg_expr[, keep_cells, drop = FALSE], spg_groups)
 
 spg_avg_by_group <- spg_summary$avg
 spg_avg_by_button <- matrix(

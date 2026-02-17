@@ -208,7 +208,7 @@ build_common_controls <- function(prefix, block, conf, def) {
           checkboxInput(
             inputId = make_id("split"),
             label = NULL,
-            value = TRUE
+            value = FALSE
           )
         ),
         tags$div(
@@ -433,8 +433,8 @@ build_gene_output_section <- function(prefix,
 build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "mf", part)
 
-  # Main Figures are currently defined around the specificCellID.1 annotation.
-  target_ui <- "specificCellID.1"
+  # Main Figures use the harmonized cell-type annotation.
+  target_ui <- "correct_cellTypes"
   levels_raw <- conf[UI == target_ui]$fID
   levels_raw <- if (length(levels_raw) && !is.na(levels_raw[[1]])) levels_raw[[1]] else ""
   cell_levels <- if (nzchar(levels_raw)) strsplit(levels_raw, "\\|")[[1]] else character(0)
@@ -475,6 +475,14 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
           max = 5,
           value = 2.5,
           step = 0.1
+        )
+      ),
+      ra_field(
+        "Cell labels",
+        checkboxInput(
+          inputId = make_id("labels"),
+          label = "Show cell labels",
+          value = TRUE
         )
       )
     )
