@@ -889,29 +889,7 @@ navbarPage(
             tags$div(
               class = "row home-icon-grid",
               column(
-                width = 3,
-                tags$a(
-                  class = "home-card-link",
-                  href = "#",
-                  role = "button",
-                  tabindex = "0",
-                  `data-target-tab` = "sc3_main_figures",
-                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
-                  div(
-                    class = "home-card",
-                    tags$img(
-                      src = "Staged_Testis_Icon.png",
-                      class = "home-card-preview fit-contain",
-                      loading = "lazy",
-                      alt = "Preview of the staged testis UMAP embeddings"
-                    ),
-                    h4("Staged Testis UMAPS"),
-                    p("Visualise cell information and gene expression side-by-side on low-dimensional representations.")
-                  )
-                )
-              ),
-              column(
-                width = 3,
+                width = 4,
                 tags$a(
                   class = "home-card-link",
                   href = "#",
@@ -933,7 +911,7 @@ navbarPage(
                 )
               ),
               column(
-                width = 3,
+                width = 4,
                 tags$a(
                   class = "home-card-link",
                   href = "#",
@@ -955,7 +933,7 @@ navbarPage(
                 )
               ),
               column(
-                width = 3,
+                width = 4,
                 tags$a(
                   class = "home-card-link",
                   href = "#",
@@ -973,97 +951,6 @@ navbarPage(
                     ),
                     h4("Cell-Cell Communication Analysis"),
                     p("Visualize ligand–receptor communication scores across stages, select LR pairs, and download customized heatmaps.")
-                  )
-                )
-              )
-            ),
-            tags$div(
-              class = "row home-icon-grid",
-              column(
-                width = 3,
-                tags$a(
-                  class = "home-card-link",
-                  href = "#",
-                  role = "button",
-                  tabindex = "0",
-                  `data-target-tab` = "sc4_main_figures",
-                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
-                  div(
-                    class = "home-card",
-                    tags$img(
-                      src = "Sertoli_Subset_Icon.png",
-                      class = "home-card-preview fit-contain",
-                      loading = "lazy",
-                      alt = "Preview of Sertoli subset"
-                    ),
-                    h4("Sertoli Subset"),
-                    p("Interactive figures for the Sertoli Subset of the main seurat.")
-                  )
-                )
-              ),
-              column(
-                width = 3,
-                tags$a(
-                  class = "home-card-link",
-                  href = "#",
-                  role = "button",
-                  tabindex = "0",
-                  `data-target-tab` = "sc5_main_figures",
-                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
-                  div(
-                    class = "home-card",
-                    tags$img(
-                      src = "Spermatogonia_Subset_Icon.png",
-                      class = "home-card-preview fit-contain",
-                      loading = "lazy",
-                      alt = "Preview of Spermatogonia subset"
-                    ),
-                    h4("Spermatogonia Subset"),
-                    p("Interactive figures for the Spermatogonia Subset of the main seurat.")
-                  )
-                )
-              ),
-              column(
-                width = 3,
-                tags$a(
-                  class = "home-card-link",
-                  href = "#",
-                  role = "button",
-                  tabindex = "0",
-                  `data-target-tab` = "sc6_main_figures",
-                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
-                  div(
-                    class = "home-card",
-                    tags$img(
-                      src = "Spermatocyte_Subset_Icon.png",
-                      class = "home-card-preview fit-contain",
-                      loading = "lazy",
-                      alt = "Preview of Spermatocyte subset"
-                    ),
-                    h4("Spermatocyte Subset"),
-                    p("Interactive figures for the Spermatocyte Subset of the main seurat.")
-                  )
-                )
-              ),
-              column(
-                width = 3,
-                tags$a(
-                  class = "home-card-link",
-                  href = "#",
-                  role = "button",
-                  tabindex = "0",
-                  `data-target-tab` = "sc7_main_figures",
-                  onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
-                  div(
-                    class = "home-card",
-                    tags$img(
-                      src = "Spermatid_Subset_Icon.png",
-                      class = "home-card-preview fit-contain",
-                      loading = "lazy",
-                      alt = "Preview of Spermatid subset"
-                    ),
-                    h4("Spermatid Subset"),
-                    p("Interactive figures for the Spermatid Subset of the main seurat.")
                   )
                 )
               )
@@ -1419,21 +1306,6 @@ navbarMenu(
             class    = "ra-btn ra-download-btn no-snapshot"
           )
         ),
-        tags$details(
-          class = "ra-reference",
-          tags$summary("Compare to publication (Fig. 5A)"),
-          tags$img(
-            src = "ra_dotplot_preview.png",
-            alt = "Published RA dotplot reference",
-            class = "ra-reference-img",
-            loading = "lazy"
-          ),
-          tags$p(
-            class = "ra-reference-caption",
-            "Use this reference image to keep downloaded plots aligned with the manuscript figure."
-          )
-        ),
-        
         # Capture container
         tags$div(
           id = "ra_dotplot_container",
@@ -1528,21 +1400,6 @@ navbarMenu(
             class    = "ra-btn ra-download-btn no-snapshot"
           )
         ),
-        tags$details(
-          class = "ra-reference",
-          tags$summary("Compare to publication (Fig. 5C)"),
-          tags$img(
-            src = "ra_lineplot_preview.png",
-            alt = "Published RA lineplot reference",
-            class = "ra-reference-img",
-            loading = "lazy"
-          ),
-          tags$p(
-            class = "ra-reference-caption",
-            "Match your trajectories against the published layout for quick visual QA."
-          )
-        ),
-        
         # Capture container
         tags$div(
           id = "ra_lineplot_container",

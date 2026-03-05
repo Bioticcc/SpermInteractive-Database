@@ -1114,7 +1114,13 @@ shinyServer(function(input, output, session) {
       "Rxra", "Rxrb", "Rxrg",
       "Dmrt1", "Rdh10", "Rbp4", "Rbp1"
     ))
-    default_genes <- desired_genes[desired_genes %in% genes]
+    default_genes <- rev(c(
+      "Stra8", "Stra6",
+      "Aldh1a1", "Aldh1a2", "Aldh1a3",
+      "Cyp26a1", "Cyp26b1", "Cyp26c1",
+      "Rdh10", "Rbp4", "Rbp1"
+    ))
+    default_genes <- default_genes[default_genes %in% genes]
     ordered_choices <- c(default_genes, setdiff(genes, default_genes))
     selected <- input$ra_genes
     if (is.null(selected) || !length(selected)) {
@@ -1160,9 +1166,9 @@ shinyServer(function(input, output, session) {
   }
 
   update_ra_line_inputs <- function(genes) {
-    default_genes_row1 <- c("Stra8", "Stra6")
-    default_genes_row2 <- c("Aldh1a1", "Aldh1a2", "Aldh1a3")
-    default_genes_row3 <- c("Cyp26a1", "Cyp26b1", "Cyp26c1")
+    default_genes_row1 <- c("Stra8", "Stra6", "Rbp1")
+    default_genes_row2 <- c("Aldh1a1", "Aldh1a2", "Aldh1a3", "Rdh10")
+    default_genes_row3 <- c("Cyp26a1", "Cyp26b1", "Cyp26c1", "Rarg")
 
     default_genes_row1 <- default_genes_row1[default_genes_row1 %in% genes]
     default_genes_row2 <- default_genes_row2[default_genes_row2 %in% genes]
@@ -5750,7 +5756,13 @@ shinyServer(function(input, output, session) {
       "Rxra", "Rxrb", "Rxrg",
       "Dmrt1", "Rdh10", "Rbp4", "Rbp1"
     ))
-    default_genes <- desired_genes_order[desired_genes_order %in% rownames(avg)]
+    default_genes <- rev(c(
+      "Stra8", "Stra6",
+      "Aldh1a1", "Aldh1a2", "Aldh1a3",
+      "Cyp26a1", "Cyp26b1", "Cyp26c1",
+      "Rdh10", "Rbp4", "Rbp1"
+    ))
+    default_genes <- default_genes[default_genes %in% rownames(avg)]
     selected_genes <- input$ra_genes
     if (is.null(selected_genes) || !length(selected_genes)) {
       selected_genes <- default_genes
@@ -5872,9 +5884,9 @@ shinyServer(function(input, output, session) {
     row1_genes <- input$ra_line_genes_row1
     row2_genes <- input$ra_line_genes_row2
     row3_genes <- input$ra_line_genes_row3
-    if (is.null(row1_genes) || !length(row1_genes)) row1_genes <- c("Stra8", "Stra6")
-    if (is.null(row2_genes) || !length(row2_genes)) row2_genes <- c("Aldh1a1", "Aldh1a2", "Aldh1a3")
-    if (is.null(row3_genes) || !length(row3_genes)) row3_genes <- c("Cyp26a1", "Cyp26b1", "Cyp26c1")
+    if (is.null(row1_genes) || !length(row1_genes)) row1_genes <- c("Stra8", "Stra6", "Rbp1")
+    if (is.null(row2_genes) || !length(row2_genes)) row2_genes <- c("Aldh1a1", "Aldh1a2", "Aldh1a3", "Rdh10")
+    if (is.null(row3_genes) || !length(row3_genes)) row3_genes <- c("Cyp26a1", "Cyp26b1", "Cyp26c1", "Rarg")
     all_genes <- unique(c(row1_genes, row2_genes, row3_genes))
     genes <- intersect(all_genes, dimnames(line_mean)[[1]])
     stage_levels <- c(
@@ -6104,12 +6116,14 @@ shinyServer(function(input, output, session) {
   
   ccc_default_lr <- c(
     "FGF17_FGFR1", "FGF2_FGFR3", "FGF7_FGFR2", "FGF1_FGFR1",
+    "FGF9_FGFR3",
     "IGF1_IGF1R", "IGF2_IGF1R", "KITL_KIT", "GDNF_GFRA1", "NRTN_GFRA2",
+    "PDGFA_PDGFRA", "CXCL12_CXCR4",
     "WNT3A_FZD7_LRP5", "WNT9A_FZD7_LRP5", "WNT8B_FZD7_LRP5", "WNT7B_FZD7_LRP5",
     "WNT3_FZD7_LRP5", "WNT1_FZD7_LRP5", "WNT5A_FZD7", "WNT11_FZD7",
     "DHH_PTCH1", "DLL3_NOTCH3", "DLL4_NOTCH1", "JAG2_NOTCH2", "JAG1_NOTCH1",
     "SEMA5A_PLXNA1", "SEMA6B_PLXNA2", "SEMA6A_PLXNA4", "SEMA3C_NRP1_PLXNA1",
-    "TGFB1_TGFBR1_TGFBR2"
+    "TGFB1_TGFBR1_TGFBR2", "TGFB2_TGFBR1_TGFBR2"
   )
 
   ensure_ccc_defaults <- function() {
