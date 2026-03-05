@@ -109,8 +109,27 @@ ra_taglist <- function(...) {
   do.call(tagList, nodes)
 }
 
+ordered_dimred_choices <- function(conf) {
+  dr_mask <- !is.na(conf$dimred) & conf$dimred
+  dr_choices <- conf$UI[dr_mask]
+  dr_choices <- dr_choices[!is.na(dr_choices)]
+
+  if (length(dr_choices) == 0) {
+    return(character(0))
+  }
+
+  umap_choices <- dr_choices[grepl("^UMAP", dr_choices, ignore.case = TRUE)]
+  tsne_choices <- dr_choices[grepl("^tSNE", dr_choices, ignore.case = TRUE)]
+  pc_choices <- dr_choices[grepl("^PC", dr_choices, ignore.case = TRUE)]
+  other_choices <- setdiff(dr_choices, c(umap_choices, tsne_choices, pc_choices))
+
+  unique(c(umap_choices, tsne_choices, pc_choices, other_choices))
+}
+
 build_common_controls <- function(prefix, block, conf, def) {
   make_id <- function(suffix) paste0(prefix, block, suffix)
+  dimred_choices <- ordered_dimred_choices(conf)
+  grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
     base <- list(
       ra_rowgroup(
         "Dimension reduction",
@@ -119,16 +138,16 @@ build_common_controls <- function(prefix, block, conf, def) {
         selectInput(
           inputId = make_id("drX"),
           label = NULL,
-          choices = conf[dimred == TRUE]$UI,
+          choices = dimred_choices,
           selected = def$dimred[1]
         )
       ),
       ra_field(
-        "Y-axis",
+          "Y-axis",
         selectInput(
           inputId = make_id("drY"),
           label = NULL,
-          choices = conf[dimred == TRUE]$UI,
+          choices = dimred_choices,
           selected = def$dimred[2]
         )
       )
@@ -142,7 +161,7 @@ build_common_controls <- function(prefix, block, conf, def) {
         selectInput(
           inputId = make_id("sub1"),
           label = NULL,
-          choices = conf[grp == TRUE]$UI,
+          choices = grouped_choices,
           selected = def$grp1
         )
       ),
@@ -229,6 +248,7 @@ build_common_controls <- function(prefix, block, conf, def) {
 
 build_cellinfo_overlay_controls <- function(prefix, block, suffix, conf, default_meta) {
   make_id <- function(part) paste0(prefix, block, part)
+  cellinfo_choices <- get_cellinfo_choices(conf, grouped_only = FALSE, include_dimred = FALSE)
   title <- if (suffix == "1") {
     "Cell information overlay"
   } else {
@@ -241,7 +261,7 @@ build_cellinfo_overlay_controls <- function(prefix, block, suffix, conf, default
       selectInput(
         inputId = make_id(paste0("inp", suffix)),
         label = NULL,
-        choices = conf$UI,
+        choices = cellinfo_choices,
         selected = default_meta
       ) %>%
         helper(
@@ -434,7 +454,11 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
   make_id <- function(part) paste0(prefix, "mf", part)
 
   # Main Figures use the harmonized cell-type annotation.
-  target_ui <- "correct_cellTypes"
+  target_ui <- resolve_ui_from_id(
+    conf,
+    preferred_ids = c("correct_cellTypes", "correct_cellType"),
+    fallback = "correct_cellTypes"
+  )
   levels_raw <- conf[UI == target_ui]$fID
   levels_raw <- if (length(levels_raw) && !is.na(levels_raw[[1]])) levels_raw[[1]] else ""
   cell_levels <- if (nzchar(levels_raw)) strsplit(levels_raw, "\\|")[[1]] else character(0)
@@ -790,6 +814,7 @@ build_gene_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) 
 
 build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "d1", part)
+  grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
 
   gene_group <- ra_rowgroup(
     "Gene list",
@@ -822,8 +847,8 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       selectInput(
         inputId = make_id("grp"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
-        selected = conf[grp == TRUE]$UI[1]
+        choices = grouped_choices,
+        selected = grouped_choices[1]
       ) %>%
         helper(
           type = "inline",
@@ -884,7 +909,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       selectInput(
         inputId = make_id("sub1"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
+        choices = grouped_choices,
         selected = def$grp1
       )
     ),
@@ -1194,6 +1219,7 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
 
 build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "c1", part)
+  grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
 
   inputs_group <- ra_rowgroup(
     "Value selection",
@@ -1202,7 +1228,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       selectInput(
         inputId = make_id("inp1"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
+        choices = grouped_choices,
         selected = def$grp1
       ) %>%
         helper(
@@ -1262,7 +1288,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       selectInput(
         inputId = make_id("sub1"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
+        choices = grouped_choices,
         selected = def$grp1
       )
     ),
@@ -1394,6 +1420,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
 
 build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "c2", part)
+  grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
 
   inputs_group <- ra_rowgroup(
     "Proportion inputs",
@@ -1402,7 +1429,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
       selectInput(
         inputId = make_id("inp1"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
+        choices = grouped_choices,
         selected = def$grp2
       ) %>%
         helper(
@@ -1421,7 +1448,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
       selectInput(
         inputId = make_id("inp2"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
+        choices = grouped_choices,
         selected = def$grp1
       ) %>%
         helper(
@@ -1462,7 +1489,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
       selectInput(
         inputId = make_id("sub1"),
         label = NULL,
-        choices = conf[grp == TRUE]$UI,
+        choices = grouped_choices,
         selected = def$grp1
       )
     ),

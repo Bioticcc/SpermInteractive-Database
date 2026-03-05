@@ -2944,6 +2944,60 @@ html[data-theme='dark'] .ra-plot-holder{
   margin-top: 8px;
 }
 
+.figure-expl-wrap{
+  width: 100%;
+  margin-top: 16px;
+}
+
+.figure-expl-details{
+  width: 100%;
+}
+
+.figure-expl-details > summary{
+  list-style: none;
+  margin-left: auto;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #1f3b66;
+  background: rgba(79, 70, 229, 0.12);
+  border: 1px solid rgba(79, 70, 229, 0.35);
+}
+
+.figure-expl-details > summary::-webkit-details-marker{
+  display: none;
+}
+
+.figure-expl-details[open] > summary{
+  margin-bottom: 10px;
+}
+
+.figure-expl-card{
+  margin-bottom: 0;
+}
+
+html[data-theme='dark'] .figure-expl-details > summary{
+  color: #e2ecff;
+  background: rgba(129, 140, 248, 0.18);
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+html[data-theme='dark'] .figure-expl-details > summary:hover,
+html[data-theme='dark'] .figure-expl-details > summary:focus-visible{
+  background: rgba(129, 140, 248, 0.26);
+}
+
+html[data-theme='lightblue'] .figure-expl-details > summary:hover,
+.figure-expl-details > summary:hover,
+.figure-expl-details > summary:focus-visible{
+  background: rgba(79, 70, 229, 0.18);
+}
+
 
 /* Unified home card look */
 .home-card {
@@ -2977,6 +3031,7 @@ html[data-theme='dark'] .ra-plot-holder{
   max-height: 140px;
   border-radius: 8px;
   object-fit: cover;
+  background: #ffffff;
   margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
 }
@@ -3026,7 +3081,7 @@ html[data-theme='dark'] .ra-plot-holder{
 
 .home-card-preview.fit-contain{
   object-fit: contain;
-  background: rgba(247, 249, 252, 0.9);
+  background: #ffffff;
 }
 
 .home-icon-grid .home-card h4{
@@ -3376,4 +3431,80 @@ html[data-theme='dark'] .heat-legend-note {
 .ra-pane .ra-plot {
   flex: 1 1 0%;
   min-width: 0;      /* prevents overflow */
+}
+
+/* Print-only layout reset for clean Save as PDF output */
+@media print {
+  @page {
+    margin: 0.5in;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    background-attachment: scroll !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .container,
+  .container-fluid,
+  .tab-content,
+  .row,
+  [class*='col-'] {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .container .tab-content,
+  .container-fluid .tab-content {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .container .tab-content::before,
+  .container-fluid .tab-content::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  .ra-controls {
+    position: static !important;
+    top: auto !important;
+  }
+
+  .ra-card,
+  .home-card,
+  .glass-card,
+  .theme-card,
+  .ra-pane,
+  .legacy-pane,
+  .ra-plot-holder {
+    overflow: visible !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .shiny-spinner-overlay {
+    display: none !important;
+  }
 }

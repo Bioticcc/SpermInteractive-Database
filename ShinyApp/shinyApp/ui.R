@@ -17,48 +17,75 @@ theme_default <- theme_light
 
 # Shareable links should capture the full interactive state in the URL.
 enableBookmarking("url")
+source("metadata_overrides.R")
+
+metadata_rules <- get_metadata_overrides(base_dir = "www")
+
+load_conf_def <- function(conf_path, def_path, rules = metadata_rules) {
+  conf <- readRDS(conf_path)
+  conf <- apply_metadata_overrides_to_conf(conf, rules = rules)
+
+  def <- readRDS(def_path)
+  def <- apply_metadata_overrides_to_def(def, conf, rules = rules)
+
+  list(conf = conf, def = def)
+}
 
 make_interactive_explanation_box <- function() {
   tags$div(
-    class = "home-card glass-card",
-    style = "width:100%; margin-top:16px;",
-    tags$p(
-      class = "ra-sub",
-      style = "margin-bottom:0;",
-      "Explanation on why figure x is being shown here! what is important about this figure specifically? what does it mean?"
-    ),
-    tags$br(),
-    tags$br(),
-    tags$br(),
-    tags$br(),
-    tags$br(),
-    tags$br(),
-    tags$br(),
-    tags$br(),
-    tags$br()
+    class = "figure-expl-wrap",
+    tags$details(
+      class = "figure-expl-details",
+      tags$summary(
+        tags$span(class = "fa fa-circle-info", `aria-hidden` = "true"),
+        "Figure Explanation"
+      ),
+      tags$div(
+        class = "home-card glass-card figure-expl-card",
+        tags$p(
+          class = "ra-sub",
+          style = "margin-bottom:0;",
+          "Explanation on why figure x is being shown here! what is important about this figure specifically? what does it mean?"
+        ),
+        tags$br(),
+        tags$br(),
+        tags$br(),
+        tags$br(),
+        tags$br(),
+        tags$br(),
+        tags$br(),
+        tags$br(),
+        tags$br()
+      )
+    )
   )
 }
 
-# sc1conf = readRDS("sc1conf.rds")
-# sc1def  = readRDS("sc1def.rds")
+# sc1conf = load_conf_def("sc1conf.rds", "sc1def.rds", rules = metadata_rules)$conf
+# sc1def  = load_conf_def("sc1conf.rds", "sc1def.rds", rules = metadata_rules)$def
 
-# sc2conf = readRDS("sc2conf.rds")
-# sc2def  = readRDS("sc2def.rds")
+# sc2conf = load_conf_def("sc2conf.rds", "sc2def.rds", rules = metadata_rules)$conf
+# sc2def  = load_conf_def("sc2conf.rds", "sc2def.rds", rules = metadata_rules)$def
 
-sc3conf = readRDS("sc3conf.rds")
-sc3def  = readRDS("sc3def.rds")
+sc3_assets <- load_conf_def("sc3conf.rds", "sc3def.rds", rules = metadata_rules)
+sc3conf <- sc3_assets$conf
+sc3def  <- sc3_assets$def
 
-sc4conf = readRDS("sc4conf.rds")
-sc4def  = readRDS("sc4def.rds")
+sc4_assets <- load_conf_def("sc4conf.rds", "sc4def.rds", rules = metadata_rules)
+sc4conf <- sc4_assets$conf
+sc4def  <- sc4_assets$def
 
-sc5conf = readRDS("sc5conf.rds")
-sc5def  = readRDS("sc5def.rds")
+sc5_assets <- load_conf_def("sc5conf.rds", "sc5def.rds", rules = metadata_rules)
+sc5conf <- sc5_assets$conf
+sc5def  <- sc5_assets$def
 
-sc6conf = readRDS("sc6conf.rds")
-sc6def  = readRDS("sc6def.rds")
+sc6_assets <- load_conf_def("sc6conf.rds", "sc6def.rds", rules = metadata_rules)
+sc6conf <- sc6_assets$conf
+sc6def  <- sc6_assets$def
 
-sc7conf = readRDS("sc7conf.rds")
-sc7def  = readRDS("sc7def.rds")
+sc7_assets <- load_conf_def("sc7conf.rds", "sc7def.rds", rules = metadata_rules)
+sc7conf <- sc7_assets$conf
+sc7def  <- sc7_assets$def
 
 source("ra_tabs.R")
 

@@ -1,0 +1,44 @@
+orig.ident,remove
+nCount_RNA,remove
+nFeature_RNA,remove
+percent_mt,Percent Mito
+percent_ribo,Percent Ribo
+percent_hb,remove
+percent_plat,remove
+percent.x,Percent X
+percent.y,Percent Y
+log10GenesPerUMI,remove
+mitoRatio,remove
+nCount_SCT,UMIs per cell
+nFeature_RNA,Genes per cell
+SCT_snn_res.0,remove
+SCT_snn_res.0.1,remove
+SCT_snn_res.0.2,remove
+SCT_snn_res.0.3,remove
+SCT_snn_res.0.4,remove
+SCT_snn_res.0.5,remove
+SCT_snn_res.0.6,remove
+SCT_snn_res.0.7,remove
+SCT_snn_res.0.8,remove
+SCT_snn_res.0.9,remove
+SCT_snn_res.1,remove
+SCT_snn_res.1.2,remove
+seurat_clusters,Seurat Clusters
+sample,Stages
+generalCellID,Major Cell Classes
+specificCellID,remove
+specificCellID,remove
+updated_annotations,remove
+pseudotime,remove
+correct_cellType,Cell Types
+PC1,remove
+PC2,remove
+PC3,remove
+PC4,remove
+PC5,remove
+UMAP1,remove
+UMAP2,remove
+tSNE1,remove
+tSNE2,remove
+,remove
+,remove

@@ -20,7 +20,10 @@ library(dplyr)
 library(viridisLite)
 library(patchwork)
 
+source("metadata_overrides.R")
 source("ra_tabs.R")
+
+metadata_rules <- get_metadata_overrides(base_dir = "www")
 
 # Lazy loader so large RDS files are only read when first needed
 lazy_rds_loader <- function(paths) {
@@ -285,28 +288,28 @@ make_lazy_data <- function(name, path, postprocess = identity, env = parent.fram
 # make_lazy_data("sc2gene", "sc2gene.rds", normalize_gene_index)
 # make_lazy_data("sc2meta", "sc2meta.rds")
 
-make_lazy_data("sc3conf", "sc3conf.rds")
-make_lazy_data("sc3def",  "sc3def.rds")
+make_lazy_data("sc3conf", "sc3conf.rds", function(obj) apply_metadata_overrides_to_conf(obj, rules = metadata_rules))
+make_lazy_data("sc3def",  "sc3def.rds", function(obj) apply_metadata_overrides_to_def(obj, sc3conf, rules = metadata_rules))
 make_lazy_data("sc3gene", "sc3gene.rds", normalize_gene_index)
 make_lazy_data("sc3meta", "sc3meta.rds")
 
-make_lazy_data("sc4conf", "sc4conf.rds")
-make_lazy_data("sc4def",  "sc4def.rds")
+make_lazy_data("sc4conf", "sc4conf.rds", function(obj) apply_metadata_overrides_to_conf(obj, rules = metadata_rules))
+make_lazy_data("sc4def",  "sc4def.rds", function(obj) apply_metadata_overrides_to_def(obj, sc4conf, rules = metadata_rules))
 make_lazy_data("sc4gene", "sc4gene.rds", normalize_gene_index)
 make_lazy_data("sc4meta", "sc4meta.rds")
 
-make_lazy_data("sc5conf", "sc5conf.rds")
-make_lazy_data("sc5def",  "sc5def.rds")
+make_lazy_data("sc5conf", "sc5conf.rds", function(obj) apply_metadata_overrides_to_conf(obj, rules = metadata_rules))
+make_lazy_data("sc5def",  "sc5def.rds", function(obj) apply_metadata_overrides_to_def(obj, sc5conf, rules = metadata_rules))
 make_lazy_data("sc5gene", "sc5gene.rds", normalize_gene_index)
 make_lazy_data("sc5meta", "sc5meta.rds")
 
-make_lazy_data("sc6conf", "sc6conf.rds")
-make_lazy_data("sc6def",  "sc6def.rds")
+make_lazy_data("sc6conf", "sc6conf.rds", function(obj) apply_metadata_overrides_to_conf(obj, rules = metadata_rules))
+make_lazy_data("sc6def",  "sc6def.rds", function(obj) apply_metadata_overrides_to_def(obj, sc6conf, rules = metadata_rules))
 make_lazy_data("sc6gene", "sc6gene.rds", normalize_gene_index)
 make_lazy_data("sc6meta", "sc6meta.rds")
 
-make_lazy_data("sc7conf", "sc7conf.rds")
-make_lazy_data("sc7def",  "sc7def.rds")
+make_lazy_data("sc7conf", "sc7conf.rds", function(obj) apply_metadata_overrides_to_conf(obj, rules = metadata_rules))
+make_lazy_data("sc7def",  "sc7def.rds", function(obj) apply_metadata_overrides_to_def(obj, sc7conf, rules = metadata_rules))
 make_lazy_data("sc7gene", "sc7gene.rds", normalize_gene_index)
 make_lazy_data("sc7meta", "sc7meta.rds")
 
@@ -435,13 +438,22 @@ is_umap_view <- function(inpConf, inpdrX, inpdrY) {
   length(dr_ids) == 2 && setequal(dr_ids, c("umap_1", "umap_2"))
 }
 
+first_valid_ui <- function(inpConf) {
+  ui_vals <- as.character(inpConf$UI)
+  ui_vals <- ui_vals[!is.na(ui_vals) & nzchar(ui_vals)]
+  if (length(ui_vals)) {
+    return(ui_vals[[1]])
+  }
+  NA_character_
+}
+
 # Plot cell information on dimred 
 scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2, 
                      inpsiz, inpcol, inpord, inpfsz, inpasp, inptxt, inplab,
                      dark_theme = FALSE,
                      stage_split = NULL,
                      stage_facet_ncol = 2){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inpdrX]$ID, inpConf[UI == inpdrY]$ID, 
                        inpConf[UI == inp1]$ID, inpConf[UI == inpsub1]$ID),  
@@ -539,7 +551,7 @@ scDRcell <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
  
 scDRnum <- function(inpConf, inpMeta, inp1, inp2, inpsub1, inpsub2, 
                     inpH5, inpGene, inpsplt){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inp1]$ID, inpConf[UI == inpsub1]$ID), 
                    with = FALSE] 
@@ -577,7 +589,7 @@ scDRgene <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inpsub1, inpsub2,
                      inpsiz, inpcol, inpord, inpfsz, inpasp, inptxt,
                      dark_theme = FALSE,
                      stage_split = NULL){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inpdrX]$ID, inpConf[UI == inpdrY]$ID, 
                        inpConf[UI == inpsub1]$ID),  
@@ -650,7 +662,7 @@ scDRcoex <- function(inpConf, inpMeta, inpdrX, inpdrY, inp1, inp2,
                      inpsub1, inpsub2, inpH5, inpGene, 
                      inpsiz, inpcol, inpord, inpfsz, inpasp, inptxt,
                      dark_theme = FALSE){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inpdrX]$ID, inpConf[UI == inpdrY]$ID, 
                        inpConf[UI == inpsub1]$ID),  
@@ -780,7 +792,7 @@ scDRcoexLeg <- function(inp1, inp2, inpcol, inpfsz, dark_theme = FALSE){
  
 scDRcoexNum <- function(inpConf, inpMeta, inp1, inp2, 
                         inpsub1, inpsub2, inpH5, inpGene){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inpsub1]$ID), with = FALSE] 
   colnames(ggData) = c("sub") 
@@ -811,7 +823,7 @@ scDRcoexNum <- function(inpConf, inpMeta, inp1, inp2,
 scVioBox <- function(inpConf, inpMeta, inp1, inp2, 
                      inpsub1, inpsub2, inpH5, inpGene, 
                      inptyp, inppts, inpsiz, inpfsz, dark_theme = FALSE){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inp1]$ID, inpConf[UI == inpsub1]$ID), 
                    with = FALSE] 
@@ -858,7 +870,7 @@ scVioBox <- function(inpConf, inpMeta, inp1, inp2,
 # Plot proportion plot 
 scProp <- function(inpConf, inpMeta, inp1, inp2, inpsub1, inpsub2, 
                    inptyp, inpflp, inpfsz, dark_theme = FALSE){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Prepare ggData 
   ggData = inpMeta[, c(inpConf[UI == inp1]$ID, inpConf[UI == inp2]$ID, 
                        inpConf[UI == inpsub1]$ID),  
@@ -910,7 +922,7 @@ scGeneList <- function(inp, inpGene){
 scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt, 
                        inpsub1, inpsub2, inpH5, inpGene, inpScl, inpRow, inpCol, 
                        inpcols, inpfsz, save = FALSE, dark_theme = FALSE){ 
-  if(is.null(inpsub1)){inpsub1 = inpConf$UI[1]} 
+  if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Identify genes that are in our dataset 
   geneList = scGeneList(inp, inpGene) 
   geneList = geneList[present == TRUE] 
@@ -2470,10 +2482,17 @@ shinyServer(function(input, output, session) {
 
   bind_main_figures <- function(prefix, get_conf, get_meta) {
     make_id <- function(part) paste0(prefix, "mf", part)
-    target_ui <- "correct_cellTypes"
+    get_target_ui <- function() {
+      resolve_ui_from_id(
+        get_conf(),
+        preferred_ids = c("correct_cellTypes", "correct_cellType"),
+        fallback = "correct_cellTypes"
+      )
+    }
 
     get_groups <- function() {
       conf <- get_conf()
+      target_ui <- get_target_ui()
       vals <- conf[UI == target_ui]$fID
       vals <- if (length(vals) && !is.na(vals[[1]])) vals[[1]] else ""
       if (!nzchar(vals)) {
@@ -2507,6 +2526,7 @@ shinyServer(function(input, output, session) {
     })
 
     output[[make_id("main")]] <- renderPlot({
+      target_ui <- get_target_ui()
       pt_size <- input[[make_id("pt")]]
       if (is.null(pt_size) || !is.finite(pt_size)) {
         pt_size <- 2.5
@@ -2547,6 +2567,7 @@ shinyServer(function(input, output, session) {
     outputOptions(output, make_id("main"), suspendWhenHidden = TRUE)
 
     output[[make_id("split")]] <- renderPlot({
+      target_ui <- get_target_ui()
       show_labels <- isTRUE(input[[make_id("labels")]])
       p <- with_dark(
         scDRcell,
@@ -2632,10 +2653,12 @@ shinyServer(function(input, output, session) {
         options = list(maxOptions = 7, create = TRUE, persist = TRUE, render = I(optCrt_local))
       )
 
-      numeric_meta <- conf[is.na(fID)]$UI
-      if (!length(numeric_meta)) {
-        numeric_meta <- character(0)
+      numeric_mask <- is.na(conf$fID)
+      if ("dimred" %in% names(conf)) {
+        numeric_mask <- numeric_mask & (is.na(conf$dimred) | !conf$dimred)
       }
+      numeric_meta <- unique(as.character(conf$UI[numeric_mask]))
+      numeric_meta <- numeric_meta[!is.na(numeric_meta) & nzchar(numeric_meta)]
       selected_y <- numeric_meta[[1]]
       if (is.null(selected_y) || is.na(selected_y) || !nzchar(selected_y)) {
         selected_y <- def$gene1
