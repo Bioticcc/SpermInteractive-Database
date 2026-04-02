@@ -23,6 +23,15 @@ Rplots.pdf
 # Backup files
 ShinyApp/shinyApp/backupFiles/
 
+# Browser network/profile captures
+ShinyApp/shinyApp/www/*.har
+ShinyApp/shinyApp/www/*.json.gz
+ShinyApp/shinyApp/www/* profile.json/
+ShinyApp/shinyApp/archive/network_profiles/*.har
+ShinyApp/shinyApp/archive/network_profiles/*.json
+ShinyApp/shinyApp/archive/network_profiles/*.json.gz
+ShinyApp/shinyApp/archive/network_profiles/* profile.json/
+
 # Secrets (never commit)
 .Renviron
 .Renviron.*
@@ -34,5 +43,6 @@ ShinyApp/shinyApp/backupFiles/
 .DS_Store
 Thumbs.db
 .vscode/
+.codex
 *:Zone.Identifier
 ShinyApp/shinyApp/all_figures.pdf

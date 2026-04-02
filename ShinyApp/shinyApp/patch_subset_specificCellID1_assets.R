@@ -4,8 +4,17 @@ suppressPackageStartupMessages({
   library(data.table)
 })
 
+bootstrap_path <- tryCatch(sys.frames()[[1]]$ofile, error = function(...) NULL)
+bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
+  dirname(normalizePath(bootstrap_path, mustWork = FALSE))
+} else {
+  getwd()
+}
+source(file.path(bootstrap_dir, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+
 args <- commandArgs(trailingOnly = TRUE)
-out_dir <- if (length(args) >= 1) args[[1]] else "."
+out_dir <- if (length(args) >= 1) sc_dir_arg(args[[1]], app_dir = app_dir) else app_dir
 prefixes <- if (length(args) >= 2) strsplit(args[[2]], ",", fixed = TRUE)[[1]] else c("sc4", "sc5", "sc7")
 prefixes <- trimws(prefixes)
 
@@ -130,4 +139,3 @@ for (p in prefixes) {
   if (!nzchar(p)) next
   patch_one(p)
 }
-

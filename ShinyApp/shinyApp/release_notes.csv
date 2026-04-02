@@ -1,0 +1,8 @@
+"version_number","update_type","update_title","update_description","update_date"
+"0.6.4","Minor","","Added a bar that users can input a custom threshold for gene expression levels into. Doesnt require clicking search or a table refresh, just type in the number and itll change.","2026-04-02"
+"0.6.3","Minor","","Slight change to RA dot and line plots, as they would flash as if reloading despite reload button not be pressed.","2026-03-31"
+"0.6.2","Minor","","Just a lot of bug fixes, and mainly, moving the download buttons to the lefthand side of the pages, rather then on the figure container on the right.","2026-03-26"
+"0.6.1","Minor","","Relatively small resolution update, focusing on forcing container widths to remain consistent, among other things. Not much technical change, just a lot of CSS edits to fix up resolution and screen size related stuff.
+Also, weve got cell numbers and statistics working! Forgot that existed for a few monthes, actually.
+CURRENTLY KNOWN BUGS: - legend for gene coexpression is a thin sliver, due to css funkiness, i believe.","2026-03-24"
+"0.6","Major","Networking Update","This release focused on network and startup performance. The home page now avoids eagerly bootstrapping the staged and subset tabs, preview imagery was reduced to web-sized assets, and the initial #home startup payload is smaller than in earlier versions. The same release also included follow-up layout and responsiveness fixes across the interactive pages, plus cleanup for the spermatogonia modal and staged/subset statistics panels.","2026-03-24"

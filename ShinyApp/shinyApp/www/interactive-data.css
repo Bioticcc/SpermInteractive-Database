@@ -1,0 +1,530 @@
+/* Unified home card look */
+.home-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: #ffffff;          /* single consistent background */
+  border: 1px solid #e9ecef;    /* single consistent border */
+  margin-bottom: 16px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.home-top-row{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.home-top-row > [class*='col-']{
+  display: flex;
+  flex-direction: column;
+}
+
+.home-top-row .home-card{
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.home-card-preview {
+  width: 100%;
+  height: 210px;
+  border-radius: 8px;
+  object-fit: contain;
+  object-position: center;
+  background: #ffffff;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+
+.home-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-card-link:hover .home-card,
+.home-card-link:focus .home-card {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.home-icon-grid{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch; /* equal-height columns */
+}
+
+.home-icon-grid > [class*='col-']{
+  display: flex;
+  flex-direction: column;
+}
+
+.home-icon-grid .home-card-link{
+  display: flex;
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+.home-icon-grid .home-card-link .home-card{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.home-icon-grid .home-card-preview{
+  height: 210px; /* keep preview heights consistent so text aligns */
+}
+
+.home-card-preview.fit-contain{
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.home-icon-grid .home-card h4{
+  line-height: 1.2;
+  min-height: 2.4em; /* reserve space for up to ~2 lines so subtext starts aligned */
+  margin: 0 0 8px 0;
+}
+
+.home-card-link:focus-visible .home-card {
+  outline: 3px solid #4F46E5;
+  outline-offset: 4px;
+}
+
+html[data-theme='dark'] .home-card,
+html[data-theme='dark'] .theme-card{
+  background: rgba(15,16,26,0.9);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 18px 36px rgba(0,0,0,0.55);
+  color: var(--color-text);
+}
+
+html[data-theme='dark'] .home-card-preview{
+  box-shadow: 0 8px 20px rgba(0,0,0,0.65);
+}
+
+html[data-theme='dark'] .home-card-link:focus-visible .home-card{
+  outline-color: rgba(20,184,166,0.7);
+}
+
+.theme-card{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #e5e9f5;
+  border-radius: 16px;
+  padding: 24px 32px;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+html[data-theme='dark'] .theme-card{
+  background: rgba(15, 18, 30, 0.92);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 26px 52px rgba(2, 6, 23, 0.75);
+  color: var(--color-text);
+}
+
+.theme-card .control-label{
+  display: none;
+}
+
+.theme-picker{
+  width: 100%;
+}
+
+.theme-picker .shiny-options-group{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.theme-picker .radio{
+  margin: 0;
+  display: flex;
+}
+
+.theme-picker .radio label{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  position: relative;
+  cursor: pointer;
+}
+
+.theme-picker .radio input[type="radio"]{
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-option{
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 18px 16px;
+  border-radius: 12px;
+  background: var(--color-white-translucent);
+  border: 1px solid var(--color-border);
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.theme-picker .radio label:hover .theme-option{
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px var(--shadow-light);
+}
+
+.theme-picker input[type="radio"]:checked + .theme-option{
+  border-color: var(--color-primary);
+  box-shadow: 0 14px 28px var(--shadow-medium);
+}
+
+.theme-picker input[type="radio"]:focus-visible + .theme-option{
+  box-shadow: 0 0 0 3px var(--color-focus-shadow), 0 14px 28px var(--shadow-medium);
+}
+
+.theme-option-title{
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.theme-option-swatches{
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.theme-option-swatch{
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+:root[data-theme='dark'] .theme-option{
+  background: rgba(30, 41, 59, 0.92);
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+:root[data-theme='dark'] .theme-option-swatch{
+  border-color: rgba(226, 232, 240, 0.2);
+}
+
+@media (max-width: 900px){
+  .theme-picker .shiny-options-group{
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+/* Welcome block adjustments */
+.home-card.home-hero h2 {
+  font-size: 2rem;   /* adjust as needed (2.2–3.0rem) */
+  margin: 4px 0 12px 0;
+  line-height: 1.2;
+}
+
+.home-card.home-hero p {
+  font-size: 1rem;  /* adjust as needed */
+  line-height: 1.7;
+}
+
+/* Optional: tighter list spacing */
+.home-card ul { margin-bottom: 0.5rem; }
+/* #7c3aed, #06b6d4);*/
+
+/* Make the SVG fill its container */
+#spermatogonia_svg {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+}
+#spermatogonia_svg svg {
+  display: block;         /* remove inline gap */
+  width: 100% !important; /* scale to column width */
+  height: 100% !important;
+  max-width: none;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+/* Optional: give the area some vertical space while loading */
+.svg-stage { 
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+
+
+/* The plot card already has position:relative via glass-card; ensure it if not */
+.ra-card.ra-plot { position: relative; }
+
+/* Busy overlay (dim + text) */
+.ra-card.ra-plot.is-busy::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(2px);
+  z-index: 20;
+}
+
+html[data-theme='dark'] .ra-card.ra-plot.is-busy::after{
+  background: rgba(5, 8, 20, 0.72);
+}
+
+.ra-card.ra-plot.is-busy::before {
+  content: "Figures are loading, please wait";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.2;
+  color: #1f2937;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(15,23,42,0.12);
+  box-shadow: 0 14px 30px rgba(15,23,42,0.12);
+  z-index: 21;
+  text-align: center;
+}
+
+html[data-theme='dark'] .ra-card.ra-plot.is-busy::before{
+  color: #e2e8f0;
+  background: rgba(9, 15, 32, 0.92);
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.85);
+}
+
+@keyframes spgspin { to { transform: rotate(360deg); } }
+
+
+/* If both classes are present, show the active (blue) color */
+.cell-btn.btn-gmatch.btn-highlight {
+  outline-color: #4F46E5 !important;
+}
+
+/* Prevent native focus ring from stacking with our custom outlines */
+.cell-btn:focus { outline: none !important; }
+
+/* Remove the browser's default thick blue focus ring */
+button:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep your custom smaller square light blue border */
+button.custom-btn:focus-visible {
+  outline: 2px solid #4da6ff; /* or whatever your current square highlight color is */
+  border-radius: 4px;         /* keep it sharp */
+}
+
+
+
+/* Scope to the table so other buttons keep normal focus styles */
+.interactive-table .table-btn:focus,
+.interactive-table .table-btn:focus-visible,
+.interactive-table .table-btn:active:focus {
+  box-shadow: none !important;   /* removes Bootstrap’s big rounded ring */
+  outline: none;                 /* don’t double up */
+}
+
+/* Keep the crisp, smaller square highlight */
+.interactive-table .table-btn:focus-visible {
+  outline: 2px solid #7ec4ff;    /* your light-blue square */
+  outline-offset: 0;
+  border-radius: 6px;            /* make it squarer if needed */
+}
+
+/* --- SVG cell highlight rules --- */
+.cell-btn {
+  stroke: none;
+  fill: transparent;
+  rx: 2;
+  ry: 2;
+  transition: stroke 120ms ease, fill 120ms ease, fill-opacity 120ms ease;
+}
+
+/* Fallback styles so matches are visible while colors load */
+.cell-btn.btn-gmatch {
+  stroke: #22D3EE;
+  stroke-width: 2px;
+  fill: rgba(34, 211, 238, 0.18);
+}
+
+/* Modal selection override */
+.cell-btn.btn-highlight {
+  stroke: #4F46E5 !important;
+  stroke-width: 3px;
+  fill: rgba(79, 70, 229, 0.12) !important;
+  fill-opacity: 1 !important;
+}
+
+.cell-btn.btn-gmatch.btn-highlight {
+  stroke: #4F46E5 !important;
+}
+
+.cell-btn,
+.cell-btn.btn-gmatch,
+.cell-btn.btn-highlight {
+  outline: none !important;
+}
+
+.cell-btn.heat-on {
+  cursor: pointer;
+}
+
+/* Optional: a tiny legend chip */
+.heat-legend {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 12px;
+}
+
+.heat-gradient {
+  width: 120px; height: 10px; border-radius: 999px;
+  background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #084594);
+  border: 1px solid #a5b7c6;
+}
+
+.heat-legend-note {
+  margin: 6px 0 0;
+  font-size: 18px;
+  color: #000000;
+  line-height: 1.4;
+}
+
+html[data-theme='dark'] .heat-legend-note {
+  color: #ffffff;
+}
+
+
+.heat-label {
+  font: 25px/1 monospace;
+  fill: #111;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: #fff;         /* white halo for contrast */
+  stroke-width: 2px;
+  opacity: 0.9;
+}
+
+
+/* Consistent sidebar width across panes */
+.ra-pane > .ra-controls,
+.ra-pane > .ra-plot {
+  min-width: 0;
+  max-width: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 899px) {
+  .home-card-preview,
+  .home-icon-grid .home-card-preview {
+    height: 180px;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-card-preview,
+  .home-icon-grid .home-card-preview {
+    height: 160px;
+  }
+}
+
+/* Print-only layout reset for clean Save as PDF output */
+@media print {
+  @page {
+    margin: 0.5in;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    background-attachment: scroll !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .container,
+  .container-fluid,
+  .tab-content,
+  .row,
+  [class*='col-'] {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .container .tab-content,
+  .container-fluid .tab-content {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .container .tab-content::before,
+  .container-fluid .tab-content::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  .ra-controls {
+    position: static !important;
+    top: auto !important;
+  }
+
+  .ra-card,
+  .home-card,
+  .glass-card,
+  .theme-card,
+  .ra-pane,
+  .legacy-pane,
+  .ra-plot-holder {
+    overflow: visible !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .shiny-spinner-overlay {
+    display: none !important;
+  }
+}

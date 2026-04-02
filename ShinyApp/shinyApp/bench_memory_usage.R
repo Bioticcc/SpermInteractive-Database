@@ -8,16 +8,15 @@ suppressPackageStartupMessages({
   library(ShinyCell)
 })
 
-args <- commandArgs(trailingOnly = FALSE)
-script_path <- grep("^--file=", args, value = TRUE)
-if (length(script_path)) {
-  app_dir <- dirname(normalizePath(sub("^--file=", "", script_path[1])))
-  setwd(app_dir)
+bootstrap_path <- tryCatch(sys.frames()[[1]]$ofile, error = function(...) NULL)
+bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
+  dirname(normalizePath(bootstrap_path, mustWork = FALSE))
 } else {
-  app_dir <- getwd()
+  getwd()
 }
-
-source("data_loaders.R", chdir = TRUE)
+source(file.path(bootstrap_dir, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+source(sc_app_path("data_loaders.R", app_dir = app_dir))
 
 report_memory <- function(label) {
   mem <- bench::bench_process_memory()
@@ -43,22 +42,6 @@ report_memory("After final_staged_object")
 loaded$specific_obj <- get_specific_obj()
 report_memory("After specificCellID")
 
-loaded$sc1 <- list(
-  conf = get_sc1conf(),
-  def = get_sc1def(),
-  gene = get_sc1gene(),
-  meta = get_sc1meta()
-)
-report_memory("After sc1 assets")
-
-loaded$sc2 <- list(
-  conf = get_sc2conf(),
-  def = get_sc2def(),
-  gene = get_sc2gene(),
-  meta = get_sc2meta()
-)
-report_memory("After sc2 assets")
-
 loaded$sc3 <- list(
   conf = get_sc3conf(),
   def = get_sc3def(),
@@ -69,9 +52,6 @@ report_memory("After sc3 assets")
 
 loaded$cellchat <- get_cellchat_scores()
 report_memory("After CellChat scores")
-
-loaded$gene_metadata <- get_gene_metadata()
-report_memory("After gene metadata")
 
 cat("\nRunning garbage collection before final check...\n")
 gc()

@@ -4,25 +4,27 @@ suppressPackageStartupMessages({
   library(Seurat)
   library(ggplot2)
   library(dplyr)
+  library(png)
   library(reshape2)
   library(scales)
   library(viridisLite)
   library(grid)
 })
 
-args <- commandArgs(trailingOnly = FALSE)
-script_path <- NULL
-if (length(args)) {
-  file_arg <- grep("^--file=", args, value = TRUE)
-  if (length(file_arg)) {
-    script_path <- normalizePath(sub("^--file=", "", file_arg[1]))
-  }
+script_args <- commandArgs(trailingOnly = FALSE)
+script_arg <- grep("^--file=", script_args, value = TRUE)
+bootstrap_path <- if (length(script_arg)) {
+  sub("^--file=", "", script_arg[[1]])
+} else {
+  tryCatch(sys.frames()[[1]]$ofile, error = function(...) NULL)
 }
-if (is.null(script_path)) {
-  script_path <- normalizePath(".")
+bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
+  dirname(normalizePath(bootstrap_path, mustWork = FALSE))
+} else {
+  getwd()
 }
-script_dir <- dirname(script_path)
-setwd(script_dir)
+source(file.path(bootstrap_dir, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
 
 message("Generating home tab preview images...")
 
@@ -32,10 +34,68 @@ ensure_dir <- function(path) {
   }
 }
 
-output_dir <- file.path(script_dir, "www")
+output_dir <- sc_www_path(app_dir = app_dir)
 ensure_dir(output_dir)
+reference_output_dir <- sc_app_path("archive", "reference_www", app_dir = app_dir)
+ensure_dir(reference_output_dir)
 
-specific_obj <- readRDS("specificCellID.rds")
+runtime_preview_height_px <- 280L
+
+optional_image_pkg <- paste0("mag", "ick")
+
+load_optional_namespace <- function(pkg_name) {
+  tryCatch(loadNamespace(pkg_name), error = function(...) NULL)
+}
+
+call_ns <- function(ns, name, ...) {
+  get(name, envir = ns, inherits = FALSE)(...)
+}
+
+image_ns <- load_optional_namespace(optional_image_pkg)
+
+write_runtime_preview <- function(source_path, target_path, height_px = runtime_preview_height_px) {
+  target_height <- max(1L, as.integer(height_px))
+
+  if (!is.null(image_ns)) {
+    img <- call_ns(image_ns, "image_read", source_path)
+    img <- call_ns(image_ns, "image_strip", img)
+    img <- call_ns(image_ns, "image_resize", img, geometry = paste0("x", target_height))
+    img <- call_ns(image_ns, "image_quantize", img, max = 256, dither = FALSE)
+    call_ns(image_ns, "image_write", img, path = target_path, format = "png")
+    return(invisible(target_path))
+  }
+
+  # Pure-R fallback when the optional image package is unavailable.
+  img <- png::readPNG(source_path)
+  img_dims <- dim(img)
+  if (length(img_dims) < 2L) {
+    stop(sprintf("Unsupported image dimensions for %s", source_path))
+  }
+
+  source_height <- as.integer(img_dims[[1]])
+  source_width <- as.integer(img_dims[[2]])
+  target_width <- max(1L, as.integer(round(target_height * source_width / source_height)))
+
+  grDevices::png(
+    filename = target_path,
+    width = target_width,
+    height = target_height,
+    bg = "transparent"
+  )
+  on.exit(grDevices::dev.off(), add = TRUE)
+  grid::grid.newpage()
+  grid::grid.raster(img, width = unit(1, "npc"), height = unit(1, "npc"), interpolate = TRUE)
+  invisible(target_path)
+}
+
+interactive_table_source_path <- file.path(output_dir, "interactiveTable.png")
+interactive_table_preview_path <- file.path(output_dir, "interactiveTable_preview.png")
+ra_runtime_preview_path <- file.path(output_dir, "ra_preview_publication_icon.png")
+
+specific_obj <- readRDS(sc_first_existing(
+  c("specificCellID_slim_nocounts.rds", "specificCellID_slim.rds", "specificCellID.rds"),
+  app_dir = app_dir
+))
 Idents(specific_obj) <- Idents(specific_obj)
 
 default_ra_genes <- c("Stra8", "Stra6", "Aldh1a1", "Aldh1a2", "Cyp26a1", "Rxra")
@@ -175,8 +235,8 @@ make_ra_lineplot <- function(obj, row1_genes, row2_genes, row3_genes) {
     )
 }
 
-dotplot_path <- file.path(output_dir, "ra_dotplot_preview.png")
-lineplot_path <- file.path(output_dir, "ra_lineplot_preview.png")
+dotplot_path <- file.path(reference_output_dir, "ra_dotplot_preview.png")
+lineplot_path <- file.path(reference_output_dir, "ra_lineplot_preview.png")
 heatmap_path <- file.path(output_dir, "ccc_heatmap_preview.png")
 
 dot_plot <- make_ra_dotplot(specific_obj, default_ra_genes, cell_types)
@@ -189,8 +249,9 @@ line_plot <- make_ra_lineplot(
   line_defaults$row3
 )
 ggsave(lineplot_path, line_plot, width = 6.2, height = 3.6, dpi = 160)
+write_runtime_preview(lineplot_path, ra_runtime_preview_path)
 
-communication_score <- read.csv("CellChat_all_stage_communication_score_LR_reverse.csv")
+communication_score <- read.csv(sc_app_path("CellChat_all_stage_communication_score_LR_reverse.csv", app_dir = app_dir))
 if (!("lr_pair" %in% names(communication_score))) {
   if ("X" %in% names(communication_score)) {
     communication_score$lr_pair <- communication_score$X
@@ -232,6 +293,15 @@ make_fig6d_preview <- function(df, selection) {
 }
 
 heatmap_plot <- make_fig6d_preview(communication_score, selected_pairs)
-ggsave(heatmap_path, heatmap_plot, width = 5.4, height = 3.4, dpi = 160)
+heatmap_source_path <- tempfile(pattern = "ccc_home_preview_", fileext = ".png")
+on.exit(unlink(heatmap_source_path, force = TRUE), add = TRUE)
+ggsave(heatmap_source_path, heatmap_plot, width = 5.4, height = 3.4, dpi = 160)
+write_runtime_preview(heatmap_source_path, heatmap_path)
 
-message("Preview images saved to ", output_dir)
+if (!file.exists(interactive_table_source_path)) {
+  stop(sprintf("Expected interactive table source image at %s", interactive_table_source_path))
+}
+write_runtime_preview(interactive_table_source_path, interactive_table_preview_path)
+
+message("Runtime preview images saved to ", output_dir)
+message("Reference preview images saved to ", reference_output_dir)

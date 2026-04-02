@@ -1,35 +1,17 @@
-library(Seurat)
-library(ShinyCell)
-library(shiny) 
-library(shinyhelper) 
-library(data.table) 
-library(Matrix) 
-library(DT) 
-library(magrittr) 
+library(shiny)
 library(bslib)
-library(plotly)
+
+source("app_support.R")
 
 theme_light <- "lightblue"
 theme_dark <- "dark"
+default_spg_expr_threshold <- 0.25
 
 # Default theme on first load (may be overridden by localStorage).
 theme_default <- theme_light
 
 # Shareable links should capture the full interactive state in the URL.
 enableBookmarking("url")
-source("metadata_overrides.R")
-
-metadata_rules <- get_metadata_overrides(base_dir = "www")
-
-load_conf_def <- function(conf_path, def_path, rules = metadata_rules) {
-  conf <- readRDS(conf_path)
-  conf <- apply_metadata_overrides_to_conf(conf, rules = rules)
-
-  def <- readRDS(def_path)
-  def <- apply_metadata_overrides_to_def(def, conf, rules = rules)
-
-  list(conf = conf, def = def)
-}
 
 make_interactive_explanation_box <- function() {
   tags$div(
@@ -61,54 +43,181 @@ make_interactive_explanation_box <- function() {
   )
 }
 
-# sc1conf = load_conf_def("sc1conf.rds", "sc1def.rds", rules = metadata_rules)$conf
-# sc1def  = load_conf_def("sc1conf.rds", "sc1def.rds", rules = metadata_rules)$def
+release_notes_path <- "release_notes.csv"
 
-# sc2conf = load_conf_def("sc2conf.rds", "sc2def.rds", rules = metadata_rules)$conf
-# sc2def  = load_conf_def("sc2conf.rds", "sc2def.rds", rules = metadata_rules)$def
+default_release_notes <- function() {
+  data.frame(
+    version_number = "0.6",
+    update_type = "Major",
+    update_title = "Networking Update",
+    update_description = paste(
+      "This release focused on network and startup performance. The home page now avoids eagerly bootstrapping the staged and subset tabs, preview imagery was reduced to web-sized assets, and the initial #home startup payload is smaller than in earlier versions.",
+      "The same release also included follow-up layout and responsiveness fixes across the interactive pages, plus cleanup for the spermatogonia modal and staged/subset statistics panels.",
+      sep = "\n\n"
+    ),
+    update_date = "2026-03-24",
+    stringsAsFactors = FALSE
+  )
+}
 
-sc3_assets <- load_conf_def("sc3conf.rds", "sc3def.rds", rules = metadata_rules)
-sc3conf <- sc3_assets$conf
-sc3def  <- sc3_assets$def
+load_release_notes <- function(path = release_notes_path) {
+  required_cols <- c(
+    "version_number",
+    "update_type",
+    "update_title",
+    "update_description",
+    "update_date"
+  )
 
-sc4_assets <- load_conf_def("sc4conf.rds", "sc4def.rds", rules = metadata_rules)
-sc4conf <- sc4_assets$conf
-sc4def  <- sc4_assets$def
+  if (!file.exists(path)) {
+    return(default_release_notes())
+  }
 
-sc5_assets <- load_conf_def("sc5conf.rds", "sc5def.rds", rules = metadata_rules)
-sc5conf <- sc5_assets$conf
-sc5def  <- sc5_assets$def
+  notes <- tryCatch(
+    read.csv(path, stringsAsFactors = FALSE, check.names = FALSE),
+    error = function(e) NULL
+  )
 
-sc6_assets <- load_conf_def("sc6conf.rds", "sc6def.rds", rules = metadata_rules)
-sc6conf <- sc6_assets$conf
-sc6def  <- sc6_assets$def
+  if (is.null(notes) || !all(required_cols %in% names(notes))) {
+    return(default_release_notes())
+  }
 
-sc7_assets <- load_conf_def("sc7conf.rds", "sc7def.rds", rules = metadata_rules)
-sc7conf <- sc7_assets$conf
-sc7def  <- sc7_assets$def
+  notes <- notes[, required_cols, drop = FALSE]
+  notes[] <- lapply(notes, function(x) trimws(as.character(x)))
+  notes <- notes[!is.na(notes$version_number) & nzchar(notes$version_number), , drop = FALSE]
 
-source("ra_tabs.R")
+  if (!nrow(notes)) {
+    return(default_release_notes())
+  }
+
+  notes
+}
+
+format_release_heading <- function(entry) {
+  stopifnot(nrow(entry) == 1)
+  if (identical(tolower(entry$update_type[[1]]), "major") && nzchar(entry$update_title[[1]])) {
+    return(paste0("Version ", entry$version_number[[1]], " - ", entry$update_title[[1]]))
+  }
+  paste0("Version ", entry$version_number[[1]])
+}
+
+format_release_date <- function(value) {
+  parsed <- suppressWarnings(as.Date(value))
+  if (is.na(parsed)) {
+    return(as.character(value))
+  }
+  format(parsed, "%B %d, %Y")
+}
+
+render_release_description <- function(text) {
+  normalized <- gsub("\r\n?", "\n", text)
+  paragraphs <- trimws(unlist(strsplit(normalized, "\n\\s*\n", perl = TRUE)))
+  paragraphs <- paragraphs[nzchar(paragraphs)]
+  if (!length(paragraphs)) {
+    paragraphs <- "No release description provided."
+  }
+  lapply(paragraphs, function(paragraph) tags$p(paragraph))
+}
+
+make_patch_notes_entry <- function(entry, include_divider = FALSE) {
+  stopifnot(nrow(entry) == 1)
+  tagList(
+    if (isTRUE(include_divider)) tags$hr(class = "ra-divider") else NULL,
+    tags$div(
+      class = "patch-notes-entry",
+      tags$h3(format_release_heading(entry)),
+      tags$p(class = "ra-sub", format_release_date(entry$update_date[[1]])),
+      render_release_description(entry$update_description[[1]])
+    )
+  )
+}
+
+release_notes_df <- load_release_notes()
+current_release <- release_notes_df[1, , drop = FALSE]
+current_release_label <- format_release_heading(current_release)
+
+make_patch_notes_page <- function() {
+  entry_nodes <- lapply(seq_len(nrow(release_notes_df)), function(i) {
+    make_patch_notes_entry(release_notes_df[i, , drop = FALSE], include_divider = i > 1)
+  })
+
+  tabPanel(
+    title = "Patch Notes",
+    value = "patch_notes",
+    tags$div(
+      class = "patch-notes-page",
+      tags$div(
+        class = "home-card glass-card patch-notes-card",
+        tags$h2("Patch Notes"),
+        tags$p(
+          class = "ra-sub",
+          "Release history and update notes for the interactive dataset."
+        ),
+        entry_nodes
+      )
+    )
+  )
+}
+
+dataset_tab_output_id <- function(tab_value) {
+  paste0("lazy_", tab_value, "_body")
+}
+
+make_lazy_dataset_tab <- function(title, value) {
+  tabPanel(
+    title = HTML(title),
+    value = value,
+    uiOutput(dataset_tab_output_id(value))
+  )
+}
+
+make_lazy_dataset_menu <- function(menu_title, prefix) {
+  tab_specs <- list(
+    list(title = "Main Figures", suffix = "main_figures"),
+    list(title = "CellInfo vs GeneExpr", suffix = "cellinfo_gene"),
+    list(title = "CellInfo vs CellInfo", suffix = "cellinfo_cellinfo"),
+    list(title = "GeneExpr vs GeneExpr", suffix = "gene_gene"),
+    list(title = "Gene coexpression", suffix = "gene_coexpression"),
+    list(title = "Violinplot / Boxplot", suffix = "violin_boxplot"),
+    list(title = "Proportion plot", suffix = "proportion_plot"),
+    list(title = "Bubbleplot / Heatmap", suffix = "bubble_heatmap")
+  )
+
+  tabs <- lapply(tab_specs, function(tab_spec) {
+    make_lazy_dataset_tab(
+      title = tab_spec$title,
+      value = paste0(prefix, "_", tab_spec$suffix)
+    )
+  })
+
+  do.call(navbarMenu, c(list(menu_title), tabs))
+}
 
 shinyUI(
   #THEMES: lightblue, dark, mint, berry, sand, forest, sunset, ocean, lavender, default
-  tags$html(`data-theme` = theme_default,
-            fluidPage(
+  fluidPage(
 tags$head(
+  tags$script(HTML(sprintf(
+    "document.documentElement.setAttribute('data-theme', '%s');",
+    theme_default
+  ))),
   tags$style(HTML("
     .shiny-output-error-validation {color: red; font-weight: bold;}
     .navbar-default .navbar-nav { font-weight: bold; font-size: 16px; }
   ")),
   tags$script(HTML("
-  console.log('Custom JS loaded');
-
   Shiny.addCustomMessageHandler('highlightButton', function(id) {
-    console.log('Highlighting', id);
-    document.getElementById(id)?.classList.add('btn-highlight');
+    var node = document.getElementById(id);
+    if (node) {
+      node.classList.add('btn-highlight');
+    }
   });
 
   Shiny.addCustomMessageHandler('unhighlightButton', function(id) {
-    console.log('Un-highlighting', id);
-    document.getElementById(id)?.classList.remove('btn-highlight');
+    var node = document.getElementById(id);
+    if (node) {
+      node.classList.remove('btn-highlight');
+    }
   });
 ")),
   
@@ -277,8 +386,7 @@ tags$head(
       var hasOwn = Object.prototype.hasOwnProperty;
 
       // ===== DEBUG TOGGLES =====
-      // Set HEAT_DEBUG=false when you're done testing
-      var HEAT_DEBUG = true;              // true = log + draw numbers
+      var HEAT_DEBUG = /(?:^|[?&])heat_debug=1(?:&|$)/.test(window.location.search);
       var HEAT_LABEL_MODE = 'value';      // 'value' | 'scaled' | 'rank'
 
       function getNode(id) { return document.getElementById(id); }
@@ -320,13 +428,13 @@ tags$head(
         return rgbToHex(r, g, b);
       }
 
-      // ===== SVG helpers for debug labels =====
-      function isSvgNode(el){ return !!(el && (el.ownerSVGElement || el.tagName === 'svg' || /svg/i.test(el.namespaceURI||''))); }
-      function ensureHeatLabel(el, text){
-        if (!HEAT_DEBUG || !isSvgNode(el)) return;
-        var id = el.id + '__label';
-        var label = document.getElementById(id);
-        if (!label){
+	      // ===== SVG helpers for heat labels =====
+	      function isSvgNode(el){ return !!(el && (el.ownerSVGElement || el.tagName === 'svg' || /svg/i.test(el.namespaceURI||''))); }
+	      function ensureHeatLabel(el, text){
+	        if (!isSvgNode(el)) return;
+	        var id = el.id + '__label';
+	        var label = document.getElementById(id);
+	        if (!label){
           label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           label.setAttribute('id', id);
           label.setAttribute('class', 'heat-label');
@@ -420,7 +528,6 @@ tags$head(
       });
 
       Shiny.addCustomMessageHandler('bulkHighlight', function (payload) {
-        console.info('[bulkHighlight] ids:', (payload && payload.match_ids) ? payload.match_ids.slice(0,10) : '(none)');
         var allBtns = document.querySelectorAll('.cell-btn');
         Array.prototype.forEach.call(allBtns, function (el) {
           el.classList.remove('btn-gmatch');
@@ -456,8 +563,6 @@ tags$head(
 
       // ===== HEATMAP =====
       Shiny.addCustomMessageHandler('heatmap-colorize', function (payload) {
-        console.info('[heatmap] message received:', payload);
-
         var colorsRaw = payload && payload.colors;
         var colors = [];
       
@@ -473,25 +578,8 @@ tags$head(
         }
         var clear = payload && payload.clear;
         var nodes = document.querySelectorAll('.cell-btn');
-      
-        // 👇 B: store last payload globally so you can inspect it any time
-        window._heat_last_payload = payload;
-      
-        // 👇 C: log the first 10 rows even if HEAT_DEBUG=false
-        if (colors.length) {
-          console.table(colors.slice(0,10).map(function(d){
-            return { id:d.id, value:d.value, scaled:d.scaled, rank:d.rank, color:d.color };
-          }));
-        } else {
-          console.warn('[heatmap] colors empty; clear=', clear, '| nodes(.cell-btn)=', nodes.length);
-        }
-        // Debug: show the first 10 items arriving from server
-        if (HEAT_DEBUG && colors.length) {
-          console.groupCollapsed('[heatmap] first 10');
-          console.table(colors.slice(0,10).map(function(d){
-            return { id:d.id, value:d.value, scaled:d.scaled, rank:d.rank, color:d.color };
-          }));
-          console.groupEnd();
+        if (HEAT_DEBUG) {
+          window._heat_last_payload = payload;
         }
 
         if (clear || !colors.length) {
@@ -580,17 +668,16 @@ tags$head(
             applyHeatVisual(el, color, fillColor, String(alpha));
           }
 
-          // Draw numeric label (debug)
-          if (HEAT_DEBUG) {
-            var txt = '';
-            if (HEAT_LABEL_MODE === 'scaled' && hasScaled) txt = scaled.toFixed(2);
-            else if (HEAT_LABEL_MODE === 'rank' && info.rank != null) txt = String(info.rank);
-            else if (HEAT_LABEL_MODE === 'value' && info.value != null && isFinite(info.value)) txt = Number(info.value).toFixed(2);
-            if (txt) ensureHeatLabel(el, txt);
-          }
-        });
-      });
-    })();
+	          // Draw numeric label for the searched gene values.
+	          var txt = '';
+	          if (HEAT_LABEL_MODE === 'scaled' && hasScaled) txt = scaled.toFixed(2);
+	          else if (HEAT_LABEL_MODE === 'rank' && info.rank != null) txt = String(info.rank);
+	          else if (HEAT_LABEL_MODE === 'value' && info.value != null && isFinite(info.value)) txt = Number(info.value).toFixed(2);
+	          if (txt) ensureHeatLabel(el, txt);
+	          else clearHeatLabel(el);
+	        });
+	      });
+	    })();
   "))
 ),
 
@@ -616,10 +703,18 @@ tags$div(
         title = "Copy a sharable URL for this view"
       )
     ),
-    tags$p(class = "hdr-subtitle",
+      tags$p(class = "hdr-subtitle",
            "An Interactive Dataset for Exploring Spermatogenesis"),
-      tags$p(class = "hdr-version",
-           "Version 0.5")
+      tags$p(
+        class = "hdr-version",
+        current_release_label, " - ",
+        tags$a(
+          href = "#patch_notes",
+          class = "hdr-version-link",
+          onclick = "return window.navToTab('patch_notes', this);",
+          "(View Patch Notes)"
+        )
+      )
   ),
   # Right: clickable logo button
   tags$div(
@@ -749,7 +844,7 @@ navbarPage(
 	              (anchor.getAttribute('href') || '').replace('#','');
 	          }
 	          function selectTabByValue(val) {
-	            if (!val) return;
+	            if (!val) return false;
 	            if (val === 'retinoic_acid_line') { val = 'retinoic_acid'; }
 	            var selector = '#mainTabs a[data-toggle=\"tab\"][data-value=\"' + val + '\"], ' +
 	              '#mainTabs a[data-bs-toggle=\"tab\"][data-value=\"' + val + '\"], ' +
@@ -766,12 +861,20 @@ navbarPage(
 	              } else {
 	                link.click();
 	              }
+	              return true;
 	            }
+	            return false;
 	          }
 	          function pushTabHistory(val, replace) {
 	            if (!val) return;
 	            if (window.history && window.history.replaceState && window.history.pushState) {
-	              var url = '#' + val;
+	              var publicPath = (window.location.pathname || '/')
+	                .replace(/\\/(_w_[^/]+)/g, '')
+	                .replace(/\\/+/g, '/');
+	              if (!publicPath) {
+	                publicPath = '/';
+	              }
+	              var url = publicPath + (window.location.search || '') + '#' + val;
 	              if (replace) {
 	                window.history.replaceState({tab: val}, '', url);
 	              } else {
@@ -790,6 +893,11 @@ navbarPage(
 	            }
 	          });
 	          window.setTimeout(function() {
+	            var requestedHash = (window.location.hash || '').replace('#','');
+	            if (requestedHash && selectTabByValue(requestedHash)) {
+	              pushTabHistory(requestedHash, true);
+	              return;
+	            }
 	            var active = document.querySelector('#mainTabs li.active a');
 	            var activeVal = getTabValueFromAnchor(active);
 	            if (activeVal) {
@@ -900,7 +1008,7 @@ navbarPage(
                   div(
                     class = "home-card",
                     tags$img(
-                      src = "interactiveTable.png",
+                      src = "interactiveTable_preview.png",
                       class = "home-card-preview",
                       loading = "lazy",
                       alt = "Preview of the spermatogenesis interactive table"
@@ -922,7 +1030,7 @@ navbarPage(
                   div(
                     class = "home-card",
                     tags$img(
-                      src = "ra_lineplot_preview.png",
+                      src = "ra_preview_publication_icon.png",
                       class = "home-card-preview",
                       loading = "lazy",
                       alt = "Preview of the RA line plot figure"
@@ -963,197 +1071,10 @@ navbarPage(
 
   
   
+  make_patch_notes_page(),
+  
+  
     navbarMenu(
-    "Staged Testis",
-    build_main_figures_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_cellinfo_gene_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_cellinfo_cellinfo_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_gene_gene_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_gene_coexpression_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_violin_boxplot_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_proportion_plot_tab("sc3", sc3conf, sc3def, "Staged Testis"),
-    build_bubble_heatmap_tab("sc3", sc3conf, sc3def, "Staged Testis")
-  ),
-  navbarMenu(
-    "Sertoli Subset",
-    build_main_figures_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_cellinfo_gene_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_cellinfo_cellinfo_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_gene_gene_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_gene_coexpression_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_violin_boxplot_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_proportion_plot_tab("sc4", sc4conf, sc4def, "Sertoli Subset"),
-    build_bubble_heatmap_tab("sc4", sc4conf, sc4def, "Sertoli Subset")
-  ),
-  navbarMenu(
-    "Spermatogonia Subset",
-    build_main_figures_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_cellinfo_gene_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_cellinfo_cellinfo_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_gene_gene_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_gene_coexpression_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_violin_boxplot_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_proportion_plot_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset"),
-    build_bubble_heatmap_tab("sc5", sc5conf, sc5def, "Spermatogonia Subset")
-  ),
-  navbarMenu(
-    "Spermatocyte Subset",
-    build_main_figures_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_cellinfo_gene_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_cellinfo_cellinfo_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_gene_gene_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_gene_coexpression_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_violin_boxplot_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_proportion_plot_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset"),
-    build_bubble_heatmap_tab("sc6", sc6conf, sc6def, "Spermatocyte Subset")
-  ),
-  navbarMenu(
-    "Spermatid Subset",
-    build_main_figures_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_cellinfo_gene_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_cellinfo_cellinfo_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_gene_gene_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_gene_coexpression_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_violin_boxplot_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_proportion_plot_tab("sc7", sc7conf, sc7def, "Spermatid Subset"),
-    build_bubble_heatmap_tab("sc7", sc7conf, sc7def, "Spermatid Subset")
-  ),
-#   navbarMenu(
-#     "Developemental Testis",
-#     build_cellinfo_gene_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-#     build_cellinfo_cellinfo_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-#     build_gene_gene_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-#     build_gene_coexpression_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-#     build_violin_boxplot_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-#     build_proportion_plot_tab("sc1", sc1conf, sc1def, "Developmental Testis"),
-#     build_bubble_heatmap_tab("sc1", sc1conf, sc1def, "Developmental Testis")
-#   ),
-#   navbarMenu(
-#     "Developemental Sertolis",
-#     build_cellinfo_gene_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-#     build_cellinfo_cellinfo_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-#     build_gene_gene_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-#     build_gene_coexpression_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-#     build_violin_boxplot_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-#     build_proportion_plot_tab("sc2", sc2conf, sc2def, "Developmental Sertolis"),
-#     build_bubble_heatmap_tab("sc2", sc2conf, sc2def, "Developmental Sertolis")
-#   ),
-#   navbarMenu(
-#     "User Upload",
-#     tabPanel(
-#       "Upload",
-#       value = "user_upload",
-#       tags$div(
-#         class = "user-upload-pane",
-#         tags$section(
-#           class = "upload-panel glass-card",
-#           tags$div(
-#             class = "upload-grid",
-#             tags$div(
-#               class = "upload-hero",
-#               tags$div(
-#                 class = "upload-icon-wrap",
-#                 icon("cloud-upload", lib = "font-awesome")
-#               ),
-#               tags$div(
-#                 class = "upload-hero-copy",
-#                 tags$h3(class = "upload-title", "Bring your Seurat data"),
-#                 tags$p(
-#                   class = "upload-hint",
-#                   HTML("Drop a prepared <code>.rds</code> file, or browse to load a Seurat object for this session.")
-#                 ),
-#                 tags$div(
-#                   class = "upload-guidelines",
-#                   tags$span(class = "upload-pill", "Save as .rds"),
-#                   tags$span(class = "upload-pill", "JoinLayers for v5"),
-#                   tags$span(class = "upload-pill", "No PHI")
-#                 ),
-#                 tags$p(
-#                   class = "upload-footnote",
-#                   "Tip: For Seurat v5 objects, run JoinLayers() before saving."
-#                 )
-#               )
-#             ),
-#             tags$div(
-#               class = "upload-form",
-#               tags$div(
-#                 class = "upload-dropzone",
-#                 fileInput(
-#                   inputId = "user_seurat_file",
-#                   label = NULL,
-#                   buttonLabel = "Browse .rds",
-#                   placeholder = "No file selected",
-#                   accept = c(".rds")
-#                 )
-#               ),
-#               tags$div(
-#                 class = "upload-progress-area",
-#                 tags$div(
-#                   class = "upload-progress-header",
-#                   tags$div(
-#                     class = "upload-progress-copy",
-#                     tags$span(class = "upload-progress-label", "Upload status"),
-#                     tags$p(
-#                       id = "user-upload-status",
-#                       class = "upload-progress-note",
-#                       `data-default` = "Select an .rds file to begin.",
-#                       "Select an .rds file to begin."
-#                     )
-#                   ),
-#                   tags$div(
-#                     class = "upload-progress-spinner",
-#                     icon("circle-notch", class = "fa-spin"),
-#                     tags$span(class = "sr-only", "Processing uploaded data")
-#                   )
-#                 )
-#               ),
-#               tags$div(
-#                 class = "upload-feedback-area",
-#                 uiOutput("user_upload_feedback"),
-#                 uiOutput("user_dataset_summary")
-#               )
-#             )
-#           )
-#         )
-#       )
-#     ),
-#     tabPanel(
-#       title = HTML("CellInfo vs GeneExpr"),
-#       value = "usr_cellinfo_gene",
-#       uiOutput("usr_cellinfo_gene_panel")
-#     ),
-#     tabPanel(
-#       title = HTML("CellInfo vs CellInfo"),
-#       value = "usr_cellinfo_cellinfo",
-#       uiOutput("usr_cellinfo_cellinfo_panel")
-#     ),
-#     tabPanel(
-#       title = HTML("GeneExpr vs GeneExpr"),
-#       value = "usr_gene_gene",
-#       uiOutput("usr_gene_gene_panel")
-#     ),
-#     tabPanel(
-#       title = HTML("Gene coexpression"),
-#       value = "usr_gene_coexpression",
-#       uiOutput("usr_gene_coexpression_panel")
-#     ),
-#     tabPanel(
-#       title = HTML("Violinplot / Boxplot"),
-#       value = "usr_violin_boxplot",
-#       uiOutput("usr_violin_boxplot_panel")
-#     ),
-#     tabPanel(
-#       title = HTML("Proportion plot"),
-#       value = "usr_proportion_plot",
-#       uiOutput("usr_proportion_plot_panel")
-#     ),
-#     tabPanel(
-#       title = HTML("Bubbleplot / Heatmap"),
-#       value = "usr_bubble_heatmap",
-#       uiOutput("usr_bubble_heatmap_panel")
-#     )
-#   ),
-navbarMenu(
   "Interactive Data",
   
   # =========================
@@ -1164,12 +1085,10 @@ navbarMenu(
     value = "spermatogonia_table",
     tags$div(
       class = "ra-pane",
-      style = "display:flex; align-items:stretch; gap:16px; width:100%;",
       
-      # ---- LEFT: controls card (UNCHANGED) ----
+      # ---- LEFT: controls card ----
       tags$div(
         class = "ra-card ra-controls glass-card",
-        style = "align-self: flex-start;",
         tags$div(
           class = "ra-card-head",
           tags$h3(class = "ra-title", "Spermatogenesis Controls"),
@@ -1183,13 +1102,29 @@ navbarMenu(
             label = NULL,
             placeholder = "Type a gene…",
             width = "100%"
+          )
+        ),
+        tags$div(
+          class = "ra-field",
+          tags$label(class = "ra-label", "Expression threshold"),
+          numericInput(
+            inputId = "spg_expr_threshold",
+            label = NULL,
+            value = default_spg_expr_threshold,
+            min = 0,
+            step = 0.001,
+            width = "100%"
           ),
+          uiOutput("spg_expr_threshold_help")
+        ),
+        tags$div(
+          class = "ra-field",
+          style = "margin-bottom: 14px;",
           actionButton(
             inputId = "gene_search_btn",
             label   = "Search",
             icon    = icon("search"),
-            class   = "btn btn-primary btn-sm",
-            style   = "margin-top: 6px;"
+            class   = "btn btn-primary btn-sm"
           )
         ),
         div(
@@ -1207,7 +1142,7 @@ navbarMenu(
       # ---- RIGHT: figure card ----
       tags$div(
         class = "ra-card ra-plot glass-card",
-        style = "flex:1 1 0%; min-width:0; max-width:unset; width:100%; position:relative;",
+        style = "position:relative;",
         
         
         # Card header
@@ -1220,14 +1155,8 @@ navbarMenu(
         # Capture container (what the PNG will include)
         tags$div(
           id = "spermatogonia_container",
-          style = "padding:12px; border-radius:12px;",
-          shinycssloaders::withSpinner(
-            uiOutput("spermatogonia_svg"),
-            type = 8,
-            color = "#4F46E5",
-            color.background = "transparent",
-            proxy.height = "720px"
-          )
+          style = "border-radius:12px;",
+          sc_spinner_ui_output("spermatogonia_svg")
         ),
         tags$p(
           class = "ra-sub",
@@ -1267,6 +1196,20 @@ navbarMenu(
           )
         ),
         tags$div(
+          class = "ra-field ra-sidebar-action-row",
+          actionButton(
+            inputId = "ra_dot_refresh",
+            label = "Reload Figure",
+            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot",
+            title = "Refresh plot"
+          ),
+          downloadButton(
+            outputId = "ra_dotplot_pdf",
+            label = "Download PDF",
+            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot"
+          )
+        ),
+        tags$div(
           class = "ra-field",
           tags$label(class = "ra-label", "Cell Types"),
           checkboxGroupInput(
@@ -1287,36 +1230,13 @@ navbarMenu(
             class = "ra-head-main",
             tags$h3(class = "ra-title", "DotPlot")
           ),
-          tags$p(class = "ra-sub", "Expression of selected RA genes across chosen cell types."),
-          tags$div(
-            class = "ra-reload-wrap",
-            actionButton(
-              inputId = "ra_dot_refresh",
-              label = "Reload Figure",
-              class = "ra-btn reload-btn no-snapshot",
-              title = "Refresh plot"
-            )
-          )
-        ),
-        tags$div(
-          class = "ra-card-download",
-          downloadButton(
-            outputId = "ra_dotplot_pdf",
-            label    = "Download PDF",
-            class    = "ra-btn ra-download-btn no-snapshot"
-          )
+          tags$p(class = "ra-sub", "Expression of selected RA genes across chosen cell types.")
         ),
         # Capture container
         tags$div(
           id = "ra_dotplot_container",
           style = "padding:12px; border-radius:12px;",
-          shinycssloaders::withSpinner(
-            plotOutput("ra_dotplot", height = "750px", width = "100%"),
-            type = 8,
-            color = "#4F46E5",
-            color.background = "transparent",
-            proxy.height = "750px"
-          )
+          sc_spinner_plot_output("ra_dotplot", height = "750px", width = "100%")
         )
       )
     ),
@@ -1367,6 +1287,20 @@ navbarMenu(
             options = list(placeholder = "Select genes for row 3"),
             width = "100%"
           )
+        ),
+        tags$div(
+          class = "ra-field ra-sidebar-action-row",
+          actionButton(
+            inputId = "ra_line_refresh",
+            label = "Reload Figure",
+            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot",
+            title = "Refresh plot"
+          ),
+          downloadButton(
+            outputId = "ra_lineplot_pdf",
+            label = "Download PDF",
+            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot"
+          )
         )
       ),
       
@@ -1381,36 +1315,13 @@ navbarMenu(
             class = "ra-head-main",
             tags$h3(class = "ra-title", "LinePlot")
           ),
-          tags$p(class = "ra-sub", "Expression trajectories of selected genes across stages."),
-          tags$div(
-            class = "ra-reload-wrap",
-            actionButton(
-              inputId = "ra_line_refresh",
-              label = "Reload Figure",
-              class = "ra-btn reload-btn no-snapshot",
-              title = "Refresh plot"
-            )
-          )
-        ),
-        tags$div(
-          class = "ra-card-download",
-          downloadButton(
-            outputId = "ra_lineplot_pdf",
-            label    = "Download PDF",
-            class    = "ra-btn ra-download-btn no-snapshot"
-          )
+          tags$p(class = "ra-sub", "Expression trajectories of selected genes across stages.")
         ),
         # Capture container
         tags$div(
           id = "ra_lineplot_container",
           style = "padding:12px; border-radius:12px;",
-          shinycssloaders::withSpinner(
-            plotOutput("ra_lineplot", height = "750px", width = "100%"),
-            type = 8,
-            color = "#4F46E5",
-            color.background = "transparent",
-            proxy.height = "750px"
-          )
+          sc_spinner_plot_output("ra_lineplot", height = "750px", width = "100%")
         )
       )
     ),
@@ -1443,6 +1354,20 @@ navbarMenu(
             options = list(placeholder = "Choose ligand–receptor pairs..."),
             width = "100%"
           )
+        ),
+        tags$div(
+          class = "ra-field ra-sidebar-action-row",
+          actionButton(
+            inputId = "ccc_refresh",
+            label = "Reload Figure",
+            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot",
+            title = "Refresh heatmap"
+          ),
+          downloadButton(
+            outputId = "ccc_pdf",
+            label = "Download PDF",
+            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot"
+          )
         )
       ),
       
@@ -1457,34 +1382,27 @@ navbarMenu(
             class = "ra-head-main",
             tags$h3(class = "ra-title", "Heatmap")
           ),
-          tags$p(class = "ra-sub", "Communication scores across stages for selected LR pairs."),
-          tags$div(
-            class = "ra-reload-wrap",
-            actionButton(
-              inputId = "ccc_refresh",
-              label = "Reload Figure",
-              class = "ra-btn reload-btn no-snapshot",
-              title = "Refresh heatmap"
-            )
-          )
+          tags$p(class = "ra-sub", "Communication scores across stages for selected LR pairs.")
         ),
         
         # Capture container
         tags$div(
           id = "ccc_heatmap_container",
           style = "padding:12px; border-radius:12px;",
-          shinycssloaders::withSpinner(
-            plotlyOutput("ccc_heatmap", height = "680px", width = "100%"),
-            type = 8,
-            color = "#4F46E5",
-            color.background = "transparent"
-          )
+          sc_spinner_plotly_output("ccc_heatmap", height = "680px", width = "100%")
         )
       )
     ),
     make_interactive_explanation_box()
   )
 ),
+
+make_lazy_dataset_menu("Staged Testis", "sc3"),
+make_lazy_dataset_menu("Sertoli Subset", "sc4"),
+make_lazy_dataset_menu("Spermatogonia Subset", "sc5"),
+make_lazy_dataset_menu("Spermatocyte Subset", "sc6"),
+make_lazy_dataset_menu("Spermatid Subset", "sc7"),
+
 
 
 
@@ -1505,7 +1423,7 @@ p(
 
 
 br(),br(),br(),br(),br() 
-))))
+)))
  
  
  

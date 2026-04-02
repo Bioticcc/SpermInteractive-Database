@@ -5,6 +5,15 @@ suppressPackageStartupMessages({
   library(Matrix)
 })
 
+bootstrap_path <- tryCatch(sys.frames()[[1]]$ofile, error = function(...) NULL)
+bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
+  dirname(normalizePath(bootstrap_path, mustWork = FALSE))
+} else {
+  getwd()
+}
+source(file.path(bootstrap_dir, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+
 args <- commandArgs(trailingOnly = TRUE)
 default_seurat_candidates <- c(
   "specificCellID_slim_nocounts.rds",
@@ -13,12 +22,11 @@ default_seurat_candidates <- c(
   "final_staged_object_slim_nocounts.rds"
 )
 seurat_path <- if (length(args) >= 1) {
-  args[[1]]
+  sc_first_existing(c(args[[1]]), app_dir = app_dir)
 } else {
-  pick <- default_seurat_candidates[file.exists(default_seurat_candidates)][1]
-  if (is.na(pick) || !nzchar(pick)) "final_staged_object_slim_nocounts.rds" else pick
+  sc_first_existing(default_seurat_candidates, app_dir = app_dir)
 }
-out_dir <- if (length(args) >= 2) args[[2]] else "."
+out_dir <- if (length(args) >= 2) sc_dir_arg(args[[2]], app_dir = app_dir) else app_dir
 
 if (!file.exists(seurat_path)) {
   stop(sprintf("Seurat object not found at: %s", seurat_path))
@@ -221,9 +229,7 @@ saveRDS(line_arr, file.path(out_dir, "ra_line_mean_expr.rds"))
 message("Computing spermatogonia table summaries...")
 mapping_path <- file.path(out_dir, "button_mapping_general.R")
 if (!file.exists(mapping_path)) {
-  script_file <- sys.frame(1)$ofile
-  script_dir <- if (!is.null(script_file)) dirname(normalizePath(script_file)) else getwd()
-  mapping_path <- file.path(script_dir, "button_mapping_general.R")
+  mapping_path <- sc_app_path("button_mapping_general.R", app_dir = app_dir)
 }
 if (!file.exists(mapping_path)) {
   stop("button_mapping_general.R not found in output dir or script dir.")

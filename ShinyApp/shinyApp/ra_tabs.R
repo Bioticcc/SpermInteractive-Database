@@ -96,12 +96,85 @@ ra_download_buttons_only <- function(pdf_id, png_id) {
   )
 }
 
+ra_download_filename_input <- function(filename_id,
+                                       label = "Filename (optional)",
+                                       placeholder = "Leave blank to use the default filename") {
+  tags$div(
+    class = "ra-download-filename",
+    textInput(
+      inputId = filename_id,
+      label = label,
+      value = "",
+      placeholder = placeholder,
+      width = "100%"
+    )
+  )
+}
+
+ra_download_entry <- function(pdf_id,
+                              png_id,
+                              height_id,
+                              width_id,
+                              height_value,
+                              width_value,
+                              title = NULL,
+                              filename_id = NULL,
+                              filename_label = "Filename (optional)",
+                              filename_placeholder = "Leave blank to use the default filename",
+                              height_label = "PDF / PNG height:",
+                              width_label = "PDF / PNG width:") {
+  tags$div(
+    class = "ra-download-entry",
+    if (!is.null(title)) {
+      tags$div(class = "ra-download-entry-title", title)
+    } else {
+      NULL
+    },
+    if (!is.null(filename_id)) {
+      ra_download_filename_input(
+        filename_id = filename_id,
+        label = filename_label,
+        placeholder = filename_placeholder
+      )
+    } else {
+      NULL
+    },
+    ra_download_row(
+      pdf_id = pdf_id,
+      png_id = png_id,
+      height_id = height_id,
+      width_id = width_id,
+      height_label = height_label,
+      width_label = width_label,
+      height_value = height_value,
+      width_value = width_value
+    )
+  )
+}
+
+ra_download_modal_trigger <- function(button_id, label = "Download Figures") {
+  actionButton(
+    inputId = button_id,
+    label = label,
+    class = "btn btn-outline-primary ra-download-modal-trigger"
+  )
+}
+
+ra_download_modal_section <- function(button_id,
+                                      title = "Figure downloads",
+                                      label = "Download Figures") {
+  ra_rowgroup(
+    title,
+    ra_download_modal_trigger(button_id = button_id, label = label)
+  )
+}
+
 ra_button_row <- function(...) {
   tags$div(class = "ra-button-row", ...)
 }
 
 ra_taglist <- function(...) {
-  nodes <- unlist(list(...), recursive = FALSE)
+  nodes <- list(...)
   nodes <- Filter(Negate(is.null), nodes)
   if (length(nodes) == 0) {
     return(NULL)
@@ -374,47 +447,20 @@ build_cellinfo_output_section <- function(prefix,
                                           block,
                                           suffix,
                                           title,
-                                          height_value,
-                                          width_value,
                                           include_stats = FALSE) {
   make_id <- function(part) paste0(prefix, block, part)
   content <- list(
     tags$div(
       class = "ra-plot-holder",
       uiOutput(make_id(paste0("oup", suffix, ".ui")))
-    ),
-    ra_download_row(
-      pdf_id = make_id(paste0("oup", suffix, ".pdf")),
-      png_id = make_id(paste0("oup", suffix, ".png")),
-      height_id = make_id(paste0("oup", suffix, ".h")),
-      width_id = make_id(paste0("oup", suffix, ".w")),
-      height_value = height_value,
-      width_value = width_value
     )
   )
   if (include_stats) {
     content <- append(
       content,
       list(
-        ra_button_row(
-          actionButton(
-            inputId = make_id("tog9"),
-            label = "Toggle cell numbers / statistics",
-            class = "btn btn-outline-primary ra-toggle-btn"
-          )
-        ),
-        conditionalPanel(
-          condition = sprintf("input.%s %% 2 == 1", make_id("tog9")),
-          ra_field(
-            "Split continuous cell info into",
-            radioButtons(
-              inputId = make_id("splt"),
-              label = NULL,
-              choices = c("Quartile", "Decile"),
-              selected = "Decile",
-              inline = TRUE
-            )
-          ),
+        ra_rowgroup(
+          "Cell numbers / statistics",
           dataTableOutput(make_id(".dt"))
         )
       )
@@ -426,26 +472,98 @@ build_cellinfo_output_section <- function(prefix,
   )
 }
 
+build_plot_download_entry <- function(prefix,
+                                      block,
+                                      suffix,
+                                      title = NULL,
+                                      height_value,
+                                      width_value) {
+  make_id <- function(part) paste0(prefix, block, part)
+  ra_download_entry(
+    pdf_id = make_id(paste0("oup", suffix, ".pdf")),
+    png_id = make_id(paste0("oup", suffix, ".png")),
+    height_id = make_id(paste0("oup", suffix, ".h")),
+    width_id = make_id(paste0("oup", suffix, ".w")),
+    filename_id = make_id(paste0("oup", suffix, ".name")),
+    height_value = height_value,
+    width_value = width_value,
+    title = title
+  )
+}
+
+build_main_figures_download_entries <- function(prefix) {
+  make_id <- function(part) paste0(prefix, "mf", part)
+  tagList(
+    ra_download_entry(
+      pdf_id = make_id("main.pdf"),
+      png_id = make_id("main.png"),
+      height_id = make_id("main.h"),
+      width_id = make_id("main.w"),
+      filename_id = make_id("main.name"),
+      height_value = 6,
+      width_value = 6,
+      title = "UMAP overview"
+    ),
+    ra_download_entry(
+      pdf_id = make_id("split.pdf"),
+      png_id = make_id("split.png"),
+      height_id = make_id("split.h"),
+      width_id = make_id("split.w"),
+      filename_id = make_id("split.name"),
+      height_value = 7,
+      width_value = 10,
+      title = "Stage-split UMAPs"
+    )
+  )
+}
+
+build_cellinfo_stats_output <- function(prefix,
+                                        block,
+                                        selected = "Decile") {
+  make_id <- function(part) paste0(prefix, block, part)
+  toggle_id <- make_id("stats_toggle")
+  tags$div(
+    class = "ra-rowgroup",
+    tags$div(
+      style = "display:flex; align-items:center; justify-content:space-between; gap:12px;",
+      tags$div(class = "ra-rowtitle", "Cell numbers / statistics"),
+      tags$div(
+        class = "legacy-advanced-toggle",
+        actionButton(
+          inputId = toggle_id,
+          label = NULL,
+          class = "btn btn-outline-primary ra-advanced-toggle",
+          icon = icon("chevron-down")
+        )
+      )
+    ),
+    conditionalPanel(
+      condition = sprintf("input.%s %% 2 == 1", toggle_id),
+      ra_field(
+        "Split continuous cell info into",
+        radioButtons(
+          inputId = make_id("splt"),
+          label = NULL,
+          choices = c("Quartile", "Decile"),
+          selected = selected,
+          inline = TRUE
+        )
+      ),
+      dataTableOutput(make_id(".dt"))
+    )
+  )
+}
+
 build_gene_output_section <- function(prefix,
                                       block,
                                       suffix,
-                                      title,
-                                      height_value,
-                                      width_value) {
+                                      title) {
   make_id <- function(part) paste0(prefix, block, part)
   ra_rowgroup(
     title,
     tags$div(
       class = "ra-plot-holder",
       uiOutput(make_id(paste0("oup", suffix, ".ui")))
-    ),
-    ra_download_row(
-      pdf_id = make_id(paste0("oup", suffix, ".pdf")),
-      png_id = make_id(paste0("oup", suffix, ".png")),
-      height_id = make_id(paste0("oup", suffix, ".h")),
-      width_id = make_id(paste0("oup", suffix, ".w")),
-      height_value = height_value,
-      width_value = width_value
     )
   )
 }
@@ -509,7 +627,8 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
           value = TRUE
         )
       )
-    )
+    ),
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   main_plot_card <- tags$div(
@@ -524,7 +643,12 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
         class = "ra-plot-holder mainfig-plot-holder",
         tags$div(
           class = "mainfig-square",
-          plotOutput(make_id("main"), height = "100%", width = "100%")
+          sc_spinner_plot_output(
+            make_id("main"),
+            height = "100%",
+            width = "100%",
+            proxy.height = "620px"
+          )
         )
       )
     )
@@ -540,7 +664,7 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
       NULL,
       tags$div(
         class = "ra-plot-holder",
-        plotOutput(make_id("split"), height = "420px", width = "100%")
+        sc_spinner_plot_output(make_id("split"), height = "420px", width = "100%")
       )
     )
   )
@@ -571,6 +695,7 @@ build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TR
   common <- build_common_controls(prefix, "a1", conf, def)
   cellinfo_overlay <- build_cellinfo_overlay_controls(prefix, "a1", "1", conf, def$meta1)
   gene_overlay <- build_gene_overlay_controls(prefix, "a1", "2", colour_default = "White-Red", order_default = "Max-1st")
+  stats_output <- build_cellinfo_stats_output(prefix, "a1")
 
   advanced_content <- ra_taglist(common$advanced, cellinfo_overlay$advanced, gene_overlay$advanced)
   base_content <- ra_taglist(common$base, cellinfo_overlay$base, gene_overlay$base)
@@ -614,7 +739,8 @@ build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TR
       class = "ra-subtext",
       "Visualise cell information and gene expression side-by-side on low-dimensional representations."
     ),
-    base_content
+    base_content,
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   plot_card <- tags$div(
@@ -623,8 +749,9 @@ build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TR
       sprintf("%s Embeddings", dataset_name),
       "Compare overlays and export publication-ready figures."
     ),
-    build_cellinfo_output_section(prefix, "a1", "1", "Cell information overlay", 6, 8, include_stats = TRUE),
-    build_gene_output_section(prefix, "a1", "2", "Gene expression overlay", 6, 8)
+    build_cellinfo_output_section(prefix, "a1", "1", "Cell information overlay"),
+    stats_output,
+    build_gene_output_section(prefix, "a1", "2", "Gene expression overlay")
   )
 
   content <- tags$div(
@@ -696,7 +823,8 @@ build_cellinfo_cellinfo_tab <- function(prefix, conf, def, dataset_name, as_tab 
       class = "ra-subtext",
       "Compare two cell information tracks on the same embedding."
     ),
-    base_content
+    base_content,
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   plot_card <- tags$div(
@@ -705,8 +833,8 @@ build_cellinfo_cellinfo_tab <- function(prefix, conf, def, dataset_name, as_tab 
       sprintf("%s Embeddings", dataset_name),
       "Side-by-side metadata overlays."
     ),
-    build_cellinfo_output_section(prefix, "a2", "1", "Cell information overlay 1", 6, 8),
-    build_cellinfo_output_section(prefix, "a2", "2", "Cell information overlay 2", 6, 8)
+    build_cellinfo_output_section(prefix, "a2", "1", "Cell information overlay 1"),
+    build_cellinfo_output_section(prefix, "a2", "2", "Cell information overlay 2")
   )
 
   content <- tags$div(
@@ -778,7 +906,8 @@ build_gene_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) 
       class = "ra-subtext",
       "Visualise two gene expression signals on the same embedding."
     ),
-    base_content
+    base_content,
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   plot_card <- tags$div(
@@ -787,8 +916,8 @@ build_gene_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) 
       sprintf("%s Embeddings", dataset_name),
       "Dual gene expression overlays."
     ),
-    build_gene_output_section(prefix, "a3", "1", "Gene expression overlay 1", 6, 8),
-    build_gene_output_section(prefix, "a3", "2", "Gene expression overlay 2", 6, 8)
+    build_gene_output_section(prefix, "a3", "1", "Gene expression overlay 1"),
+    build_gene_output_section(prefix, "a3", "2", "Gene expression overlay 2")
   )
 
   content <- tags$div(
@@ -913,7 +1042,19 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         selected = def$grp1
       )
     ),
-    uiOutput(make_id("sub1.ui"))
+    uiOutput(make_id("sub1.ui")),
+    ra_button_row(
+      actionButton(
+        inputId = make_id("sub1all"),
+        label = "Select all groups",
+        class = "btn btn-primary btn-sm"
+      ),
+      actionButton(
+        inputId = make_id("sub1non"),
+        label = "Deselect all groups",
+        class = "btn btn-outline-secondary btn-sm"
+      )
+    )
   )
 
   display_group <- ra_rowgroup(
@@ -955,7 +1096,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
   adv_toggle_id <- make_id("adv")
   advanced_card <- if (!is.null(advanced_content)) {
     tags$div(
-      class = "ra-card ra-controls glass-card legacy-advanced",
+      class = "ra-card ra-controls glass-card legacy-advanced legacy-advanced-two-col",
       ra_card_head(
         "Toggle Advanced Controls",
         "Subset groups and reveal styling controls.",
@@ -972,7 +1113,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       conditionalPanel(
         condition = sprintf("input.%s %% 2 == 1", adv_toggle_id),
         tags$div(
-          class = "legacy-advanced-body",
+          class = "legacy-advanced-body legacy-advanced-two-col-body",
           advanced_content
         )
       )
@@ -991,7 +1132,8 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       class = "ra-subtext",
       "Visualise the gene expression patterns of multiple genes grouped by categorical cell information."
     ),
-    base_content
+    base_content,
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   plot_card <- tags$div(
@@ -1006,14 +1148,6 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       tags$div(
         class = "ra-plot-holder",
         uiOutput(make_id("oup.ui"))
-      ),
-      ra_download_row(
-        pdf_id = make_id("oup.pdf"),
-        png_id = make_id("oup.png"),
-        height_id = make_id("oup.h"),
-        width_id = make_id("oup.w"),
-        height_value = 10,
-        width_value = 10
       )
     )
   )
@@ -1113,8 +1247,8 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
     )
   )
 
-  advanced_content <- ra_taglist(common$advanced, list(style_group))
-  base_content <- ra_taglist(common$base, list(gene_group))
+  advanced_content <- ra_taglist(common$advanced, style_group)
+  base_content <- ra_taglist(common$base, gene_group)
 
   adv_toggle_id <- make_id("adv")
   advanced_card <- if (!is.null(advanced_content)) {
@@ -1155,7 +1289,8 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
       class = "ra-subtext",
       "Visualise overlapping and unique expression for two genes on the selected embedding."
     ),
-    base_content
+    base_content,
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   plot_card <- tags$div(
@@ -1169,30 +1304,35 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
       tags$div(
         class = "ra-plot-holder",
         uiOutput(make_id("oup1.ui"))
-      ),
-      ra_download_row(
-        pdf_id = make_id("oup1.pdf"),
-        png_id = make_id("oup1.png"),
-        height_id = make_id("oup1.h"),
-        width_id = make_id("oup1.w"),
-        height_value = 6,
-        width_value = 8
       )
     ),
-    ra_rowgroup(
-      "Legend",
+    tags$div(
+      class = "coexpression-support-grid",
       tags$div(
-        class = "ra-plot-holder",
-        uiOutput(make_id("oup2.ui"))
+        class = "coexpression-support-panel coexpression-support-legend",
+        ra_rowgroup(
+          "Legend",
+          tags$div(
+            class = "ra-plot-holder coexpression-legend-holder",
+            tags$div(
+              class = "coexpression-legend-output-wrap",
+              sc_spinner_plot_output(
+                make_id("oup2"),
+                height = "300px",
+                width = "100%",
+                proxy.height = "300px"
+              )
+            )
+          )
+        )
       ),
-      ra_download_buttons_only(
-        pdf_id = make_id("oup2.pdf"),
-        png_id = make_id("oup2.png")
+      tags$div(
+        class = "coexpression-support-panel coexpression-support-table",
+        ra_rowgroup(
+          "Cell numbers",
+          dataTableOutput(make_id(".dt"))
+        )
       )
-    ),
-    ra_rowgroup(
-      "Cell numbers",
-      dataTableOutput(make_id(".dt"))
     )
   )
 
@@ -1247,7 +1387,8 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       selectizeInput(
         inputId = make_id("inp2"),
         label = NULL,
-        choices = NULL,
+        choices = c("Genes per cell"),
+        selected = "Genes per cell",
         options = list(placeholder = "Type a gene or metric")
       ) %>%
         helper(
@@ -1292,7 +1433,19 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         selected = def$grp1
       )
     ),
-    uiOutput(make_id("sub1.ui"))
+    uiOutput(make_id("sub1.ui")),
+    ra_button_row(
+      actionButton(
+        inputId = make_id("sub1all"),
+        label = "Select all groups",
+        class = "btn btn-primary btn-sm"
+      ),
+      actionButton(
+        inputId = make_id("sub1non"),
+        label = "Deselect all groups",
+        class = "btn btn-outline-secondary btn-sm"
+      )
+    )
   )
 
   display_group <- ra_rowgroup(
@@ -1340,7 +1493,8 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       class = "ra-subtext",
       "Compare continuous metadata or gene expression distributions across categorical groups."
     ),
-    ra_taglist(inputs_group)
+    ra_taglist(inputs_group),
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   advanced_content <- ra_taglist(subset_group, display_group)
@@ -1348,7 +1502,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
   adv_toggle_id <- make_id("adv")
   advanced_card <- if (!is.null(advanced_content)) {
     tags$div(
-      class = "ra-card ra-controls glass-card legacy-advanced",
+      class = "ra-card ra-controls glass-card legacy-advanced legacy-advanced-two-col",
       ra_card_head(
         "Toggle Advanced Controls",
         "Subset cells and adjust rendering details.",
@@ -1365,7 +1519,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       conditionalPanel(
         condition = sprintf("input.%s %% 2 == 1", adv_toggle_id),
         tags$div(
-          class = "legacy-advanced-body",
+          class = "legacy-advanced-body legacy-advanced-two-col-body",
           advanced_content
         )
       )
@@ -1385,14 +1539,6 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
       tags$div(
         class = "ra-plot-holder",
         uiOutput(make_id("oup.ui"))
-      ),
-      ra_download_row(
-        pdf_id = make_id("oup.pdf"),
-        png_id = make_id("oup.png"),
-        height_id = make_id("oup.h"),
-        width_id = make_id("oup.w"),
-        height_value = 8,
-        width_value = 10
       )
     )
   )
@@ -1493,7 +1639,19 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
         selected = def$grp1
       )
     ),
-    uiOutput(make_id("sub1.ui"))
+    uiOutput(make_id("sub1.ui")),
+    ra_button_row(
+      actionButton(
+        inputId = make_id("sub1all"),
+        label = "Select all groups",
+        class = "btn btn-primary btn-sm"
+      ),
+      actionButton(
+        inputId = make_id("sub1non"),
+        label = "Deselect all groups",
+        class = "btn btn-outline-secondary btn-sm"
+      )
+    )
   )
 
   display_group <- ra_rowgroup(
@@ -1530,7 +1688,8 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
       class = "ra-subtext",
       "Quantify how categorical covariates distribute across another grouping."
     ),
-    ra_taglist(inputs_group)
+    ra_taglist(inputs_group),
+    ra_download_modal_section(make_id("downloads_open"))
   )
 
   advanced_content <- ra_taglist(subset_group, display_group)
@@ -1538,7 +1697,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
   adv_toggle_id <- make_id("adv")
   advanced_card <- if (!is.null(advanced_content)) {
     tags$div(
-      class = "ra-card ra-controls glass-card legacy-advanced",
+      class = "ra-card ra-controls glass-card legacy-advanced legacy-advanced-two-col",
       ra_card_head(
         "Toggle Advanced Controls",
         "Filter cells and refine the bar chart presentation.",
@@ -1555,7 +1714,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
       conditionalPanel(
         condition = sprintf("input.%s %% 2 == 1", adv_toggle_id),
         tags$div(
-          class = "legacy-advanced-body",
+          class = "legacy-advanced-body legacy-advanced-two-col-body",
           advanced_content
         )
       )
@@ -1575,14 +1734,6 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
       tags$div(
         class = "ra-plot-holder",
         uiOutput(make_id("oup.ui"))
-      ),
-      ra_download_row(
-        pdf_id = make_id("oup.pdf"),
-        png_id = make_id("oup.png"),
-        height_id = make_id("oup.h"),
-        width_id = make_id("oup.w"),
-        height_value = 8,
-        width_value = 10
       )
     )
   )

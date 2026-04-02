@@ -6,6 +6,15 @@ suppressPackageStartupMessages({
   library(data.table)
 })
 
+bootstrap_path <- tryCatch(sys.frames()[[1]]$ofile, error = function(...) NULL)
+bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
+  dirname(normalizePath(bootstrap_path, mustWork = FALSE))
+} else {
+  getwd()
+}
+source(file.path(bootstrap_dir, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
   stop(
@@ -14,16 +23,16 @@ if (length(args) < 2) {
       "  Rscript build_shinycell_assets.R <seurat_rds> <prefix> [out_dir] [chunk_size]",
       "",
       "Example:",
-      "  Rscript build_shinycell_assets.R shinyApp/02_Sertoli.rds sc4 shinyApp 500",
+      "  Rscript ShinyApp/shinyApp/build_shinycell_assets.R /path/to/02_Sertoli.rds sc4 ShinyApp/shinyApp 500",
       sep = "\n"
     ),
     call. = FALSE
   )
 }
 
-seurat_path <- args[[1]]
+seurat_path <- sc_first_existing(c(args[[1]]), app_dir = app_dir)
 prefix <- args[[2]]
-out_dir <- if (length(args) >= 3) args[[3]] else "."
+out_dir <- if (length(args) >= 3) sc_dir_arg(args[[3]], app_dir = app_dir) else app_dir
 chunk_size <- if (length(args) >= 4) as.integer(args[[4]]) else 500L
 if (is.na(chunk_size) || chunk_size <= 0) {
   chunk_size <- 500L

@@ -16,6 +16,14 @@ specificCellID*.rds
 sc1*
 sc2*
 
+# Reference/archive artifacts
+archive/
+
+# Browser network/profile captures accidentally copied into www/
+www/*.har
+www/*.json.gz
+www/* profile.json/
+
 # Local deployment metadata
 rsconnect/
 
