@@ -23,7 +23,10 @@ release_update_title <- "Navigation Restructure and Figure Explanations"
 release_update_description <- paste(
   c(
     "* Updated dark mode UI so the logo is less jarring, as well as fixing other minor dark mode related bugs",
-    "* Updated descriptions and explanation text for multiple sections."
+    "* Updated descriptions and explanation text for multiple sections.",
+    "* Fixed cross-browser navigation structure warnings by moving reference/footer content into the navbar footer.",
+    "* Improved Safari and Firefox compatibility for scrolling, modal cleanup, hash navigation, and interactive table highlighting.",
+    "* Simplified gene query selection styling to avoid odd text highlighting behavior across browsers."
   ),
   collapse = "\n\n"
 )

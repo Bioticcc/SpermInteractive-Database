@@ -1,7 +1,13 @@
 "version_number","update_type","update_title","update_description","update_date"
 "0.8.3","Minor","","* Updated dark mode UI so the logo is less jarring, as well as fixing other minor dark mode related bugs
 
-* Updated descriptions and explanation text for multiple sections.","2026-06-05"
+* Updated descriptions and explanation text for multiple sections.
+
+* Fixed cross-browser navigation structure warnings by moving reference/footer content into the navbar footer.
+
+* Improved Safari and Firefox compatibility for scrolling, modal cleanup, hash navigation, and interactive table highlighting.
+
+* Simplified gene query selection styling to avoid odd text highlighting behavior across browsers.","2026-06-14"
 "0.8.2","Minor","","* Updated default settings for a few plots
 
 * Updates figure download options and fixed automatic refresh on the Interactive Data plots.

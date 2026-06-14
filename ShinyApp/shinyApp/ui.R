@@ -303,21 +303,6 @@ tags$head(
     .shiny-output-error-validation {color: red; font-weight: bold;}
     .navbar-default .navbar-nav { font-weight: bold; font-size: 16px; }
   ")),
-  tags$script(HTML("
-  Shiny.addCustomMessageHandler('highlightButton', function(id) {
-    var node = document.getElementById(id);
-    if (node) {
-      node.classList.add('btn-highlight');
-    }
-  });
-
-  Shiny.addCustomMessageHandler('unhighlightButton', function(id) {
-    var node = document.getElementById(id);
-    if (node) {
-      node.classList.remove('btn-highlight');
-    }
-  });
-")),
   
   
 ),
@@ -579,6 +564,17 @@ tags$head(
 	      function isSvgNode(el){ return !!(el && (el.ownerSVGElement || el.tagName === 'svg' || /svg/i.test(el.namespaceURI||''))); }
 	      function ensureHeatLabel(el, text){
 	        if (!isSvgNode(el)) return;
+	        var bb;
+	        try {
+	          bb = el.getBBox();
+	        } catch (err) {
+	          clearHeatLabel(el);
+	          return;
+	        }
+	        if (!bb || !isFinite(bb.x) || !isFinite(bb.y) || !isFinite(bb.width) || !isFinite(bb.height) || bb.width <= 0 || bb.height <= 0) {
+	          clearHeatLabel(el);
+	          return;
+	        }
 	        var id = el.id + '__label';
 	        var label = document.getElementById(id);
 	        if (!label){
@@ -587,7 +583,6 @@ tags$head(
           label.setAttribute('class', 'heat-label');
           if (el.parentNode) el.parentNode.insertBefore(label, el.nextSibling);
         }
-        var bb = el.getBBox();
         label.setAttribute('x', (bb.x + bb.width/2));
         label.setAttribute('y', (bb.y + bb.height/2));
         label.textContent = text;
@@ -708,6 +703,18 @@ tags$head(
         if (isBusy) host.classList.add('is-busy'); else host.classList.remove('is-busy');
       });
 
+      function cleanupModalScrollLock() {
+        window.setTimeout(function () {
+          if (document.querySelector('.modal.show, .modal.in')) return;
+          document.body.classList.remove('modal-open');
+          document.body.style.removeProperty('overflow');
+          document.body.style.removeProperty('padding-right');
+          Array.prototype.forEach.call(document.querySelectorAll('.modal-backdrop'), function (backdrop) {
+            if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+          });
+        }, 50);
+      }
+
       // FIX for earlier error: attach to document (always exists)
       document.addEventListener('hidden.bs.modal', function () {
         setSpgModalLocked(false);
@@ -715,10 +722,11 @@ tags$head(
           Shiny.setInputValue('__modal__closed__', Date.now(), {priority: 'event'});
         }
         if (activeBtnId) {
-          restoreHighlight(getNode(activeBtnId));
-          activeBtnId = null;
-        }
-      });
+            restoreHighlight(getNode(activeBtnId));
+            activeBtnId = null;
+          }
+          cleanupModalScrollLock();
+        });
 
       document.addEventListener('mousedown', function (e) {
         var btn = e.target.closest && e.target.closest('.cell-btn');
@@ -983,6 +991,25 @@ navbarPage(
             }
 	            $('.dropdown-backdrop').remove();
 	          }
+	          function markInternalNavItems() {
+	            var selectors = [
+	              '#mainTabs > li > a[data-value^=\"sc3_\"]:not([data-value$=\"_main_figures\"])',
+	              '#mainTabs > li > a[data-value=\"retinoic_acid\"]',
+	              '#mainTabs > li > a[data-value=\"cell2cell_heatmaps\"]',
+	              '#mainTabs > li > a[data-value=\"patch_notes\"]',
+	              '#mainTabs > li > a[href=\"#patch_notes\"]',
+	              '#mainTabs .dropdown-menu > li > a[data-value^=\"sc4_\"]:not([data-value$=\"_main_figures\"])',
+	              '#mainTabs .dropdown-menu > li > a[data-value^=\"sc5_\"]:not([data-value$=\"_main_figures\"])',
+	              '#mainTabs .dropdown-menu > li > a[data-value^=\"sc6_\"]:not([data-value$=\"_main_figures\"])',
+	              '#mainTabs .dropdown-menu > li > a[data-value^=\"sc7_\"]:not([data-value$=\"_main_figures\"])'
+	            ];
+	            selectors.forEach(function(selector) {
+	              Array.prototype.forEach.call(document.querySelectorAll(selector), function(anchor) {
+	                var item = anchor.closest && anchor.closest('li');
+	                if (item) item.classList.add('nav-hidden-by-app');
+	              });
+	            });
+	          }
 	          function resizePlotlyActive() {
 	            if (!(window.Plotly && window.Plotly.Plots && typeof window.Plotly.Plots.resize === 'function')) {
 	              return;
@@ -1019,24 +1046,18 @@ navbarPage(
 	              (anchor.getAttribute('data-bs-target') || '').replace('#','') ||
 	              (anchor.getAttribute('href') || '').replace('#','');
 	          }
-	          function selectTabByValue(val) {
+	          function normalizeTabValue(val) {
 	            if (!val) return false;
 	            if (val === 'retinoic_acid_line') { val = 'retinoic_acid'; }
-	            var selector = '#mainTabs a[data-toggle=\"tab\"][data-value=\"' + val + '\"], ' +
-	              '#mainTabs a[data-bs-toggle=\"tab\"][data-value=\"' + val + '\"], ' +
-	              '#mainTabs a[role=\"tab\"][data-value=\"' + val + '\"]';
-	            var link = document.querySelector(selector);
-	            if (!link) {
-	              selector = '#mainTabs a[href=\"#' + val + '\"]';
-	              link = document.querySelector(selector);
-	            }
-	            if (link) {
-	              suppressHistory = true;
-	              if (window.jQuery && window.jQuery.fn && window.jQuery.fn.tab) {
-	                window.jQuery(link).tab('show');
-	              } else {
-	                link.click();
-	              }
+	            return val;
+	          }
+	          function selectTabByValue(val, options) {
+	            var nextVal = normalizeTabValue(val);
+	            if (!nextVal) return false;
+	            options = options || {};
+	            if (window.Shiny && typeof Shiny.setInputValue === 'function') {
+	              suppressHistory = !!options.suppressHistory;
+	              Shiny.setInputValue('home_card_nav', nextVal, {priority: 'event'});
 	              return true;
 	            }
 	            return false;
@@ -1065,22 +1086,30 @@ navbarPage(
 	            var hashTab = (window.location.hash || '').replace('#','');
 	            var target = stateTab || hashTab;
 	            if (target) {
-	              selectTabByValue(target);
+	              selectTabByValue(target, {suppressHistory: true});
 	            }
 	          });
-	          window.setTimeout(function() {
-	            var requestedHash = (window.location.hash || '').replace('#','');
-	            if (requestedHash && selectTabByValue(requestedHash)) {
-	              pushTabHistory(requestedHash, true);
-	              return;
+	          markInternalNavItems();
+	          waitFor(
+	            function() { return window.Shiny && typeof Shiny.setInputValue === 'function'; },
+	            function() {
+	              window.setTimeout(function() {
+	                markInternalNavItems();
+	                var requestedHash = normalizeTabValue((window.location.hash || '').replace('#',''));
+	                if (requestedHash && selectTabByValue(requestedHash, {suppressHistory: true})) {
+	                  pushTabHistory(requestedHash, true);
+	                  return;
+	                }
+	                var active = document.querySelector('#mainTabs li.active a');
+	                var activeVal = normalizeTabValue(getTabValueFromAnchor(active));
+	                if (activeVal) {
+	                  pushTabHistory(activeVal, true);
+	                }
+	              }, 0);
 	            }
-	            var active = document.querySelector('#mainTabs li.active a');
-	            var activeVal = getTabValueFromAnchor(active);
-	            if (activeVal) {
-	              pushTabHistory(activeVal, true);
-	            }
-	          }, 0);
+	          );
 	          $(document).on('shown.bs.tab', '#mainTabs a[data-toggle=\"tab\"], #mainTabs a[data-bs-toggle=\"tab\"], #mainTabs a[role=\"tab\"]', function() {
+	            markInternalNavItems();
 	            var tabVal = getTabValueFromAnchor(this);
 	            if (suppressHistory) {
 	              suppressHistory = false;
@@ -1092,6 +1121,7 @@ navbarPage(
 	          });
 	          $(document).on('shiny:inputchanged', function(event) {
 	            if (!event || event.name !== 'mainTabs') return;
+	            markInternalNavItems();
 	            window.setTimeout(function() { closeAllDropdowns('mainTabs'); }, 160);
 	            schedulePlotlyResizes();
 	          });
@@ -1118,9 +1148,25 @@ navbarPage(
       })();
     "))
     ,
-#     tags$script(src = "upload.js")
-  ),
-  selected = "home",        # make Home the default landing page
+  #     tags$script(src = "upload.js")
+    ),
+    footer = tagList(
+      br(),
+      p(
+        strong("Reference: "),
+        "Hayden McSwiggin, ",
+        "Single Nuclei Analysis of Staged Seminiferous Tubules (Unpublished, expected mid 2026)",
+        style = "font-size: 125%;"
+      ),
+      p(
+        em("This webpage was made using "),
+        a("ShinyCell", href = "https://github.com/SGDDNB/ShinyCell", target = "_blank"),
+        em(" — By Adam Tomasz Ward "),
+        a("(GitHub)", href = "https://github.com/Bioticcc", target = "_blank")
+      ),
+      br(), br(), br(), br(), br()
+    ),
+    selected = "home",        # make Home the default landing page
   
   tabPanel(
     title = tagList(icon("house"), "Home"),
@@ -1572,28 +1618,7 @@ make_lazy_dataset_tab("Gene coexpression", "sc3_gene_coexpression"),
 make_lazy_dataset_tab("Violinplot / Boxplot", "sc3_violin_boxplot"),
 make_lazy_dataset_tab("Proportion plot", "sc3_proportion_plot"),
 make_lazy_dataset_tab("Bubbleplot / Heatmap", "sc3_bubble_heatmap"),
-make_cell_subsets_menu(),
-
-
-
-
-   
-br(), 
-p(
-  strong("Reference: "),
-  "Hayden McSwiggin, ",
-  "Single Nuclei Analysis of Staged Seminiferous Tubules (Unpublished, expected mid 2026)",
-  style = "font-size: 125%;"
-), 
-p(
-  em("This webpage was made using "),
-  a("ShinyCell", href = "https://github.com/SGDDNB/ShinyCell", target = "_blank"),
-  em(" — By Adam Tomasz Ward "),
-  a("(GitHub)", href = "https://github.com/Bioticcc", target = "_blank")
-),
-
-
-br(),br(),br(),br(),br() 
+make_cell_subsets_menu()
 )))
  
  

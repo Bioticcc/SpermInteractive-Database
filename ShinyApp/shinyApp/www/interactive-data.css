@@ -149,30 +149,12 @@ html[data-theme='dark'] .home-preview-dark{
   color: inherit !important;
   caret-color: currentColor;
   -webkit-box-shadow: none !important;
-  -webkit-text-fill-color: currentColor !important;
 }
 
 #gene_search + .selectize-control .selectize-input > input::placeholder,
 #gene_search ~ .selectize-control .selectize-input > input::placeholder {
   color: rgba(71, 85, 105, 0.62) !important;
   opacity: 1;
-}
-
-#gene_search + .selectize-control .selectize-input::selection,
-#gene_search ~ .selectize-control .selectize-input::selection,
-#gene_search + .selectize-control .selectize-input *::selection,
-#gene_search ~ .selectize-control .selectize-input *::selection {
-  background: rgba(37, 99, 235, 0.28);
-  color: #0f172a;
-  -webkit-text-fill-color: #0f172a;
-}
-
-#gene_search + .selectize-control .selectize-input::-moz-selection,
-#gene_search ~ .selectize-control .selectize-input::-moz-selection,
-#gene_search + .selectize-control .selectize-input *::-moz-selection,
-#gene_search ~ .selectize-control .selectize-input *::-moz-selection {
-  background: rgba(37, 99, 235, 0.28);
-  color: #0f172a;
 }
 
 html[data-theme='dark'] #gene_search + .selectize-control .selectize-input,
@@ -203,30 +185,12 @@ html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input > inp
   background: transparent !important;
   color: var(--color-text) !important;
   caret-color: var(--color-text);
-  -webkit-text-fill-color: var(--color-text) !important;
 }
 
 html[data-theme='dark'] #gene_search + .selectize-control .selectize-input > input::placeholder,
 html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input > input::placeholder {
   color: rgba(226, 232, 240, 0.65) !important;
   opacity: 1;
-}
-
-html[data-theme='dark'] #gene_search + .selectize-control .selectize-input::selection,
-html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input::selection,
-html[data-theme='dark'] #gene_search + .selectize-control .selectize-input *::selection,
-html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input *::selection {
-  background: rgba(147, 197, 253, 0.75);
-  color: #020617;
-  -webkit-text-fill-color: #020617;
-}
-
-html[data-theme='dark'] #gene_search + .selectize-control .selectize-input::-moz-selection,
-html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input::-moz-selection,
-html[data-theme='dark'] #gene_search + .selectize-control .selectize-input *::-moz-selection,
-html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input *::-moz-selection {
-  background: rgba(147, 197, 253, 0.75);
-  color: #020617;
 }
 
 html[data-theme='dark'] .home-card-link:focus-visible .home-card{
@@ -464,12 +428,6 @@ html[data-theme='dark'] .cell-btn.btn-gmatch.btn-highlight {
 
 /* Prevent native focus ring from stacking with our custom outlines */
 .cell-btn:focus { outline: none !important; }
-
-/* Remove the browser's default thick blue focus ring */
-button:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
 
 /* Keep your custom smaller square light blue border */
 button.custom-btn:focus-visible {

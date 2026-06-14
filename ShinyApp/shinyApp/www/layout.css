@@ -65,9 +65,15 @@ body {
     var(--color-html-bg-2),
     var(--color-html-bg-3)
   );
-  background-attachment: fixed; /* optional, locks gradient to viewport */
+  background-attachment: scroll;
   font-family: 'Open Sans', sans-serif;
   color: var(--color-text);
+}
+
+@supports (min-height: 100dvh) {
+  body {
+    min-height: 100dvh;
+  }
 }
 
 /* Remove white fill from central content */
@@ -223,9 +229,7 @@ h4 {
   display: none !important;
 }
 
-#mainTabs > li:has(> a[data-value^='sc3_']:not([data-value$='_main_figures'])),
-#mainTabs > li:has(> a[data-value='retinoic_acid']),
-#mainTabs > li:has(> a[data-value='cell2cell_heatmaps']) {
+#mainTabs .nav-hidden-by-app {
   display: none !important;
 }
 
@@ -235,14 +239,6 @@ h4 {
 #mainTabs .dropdown-menu > li > a[data-value^='sc7_']:not([data-value$='_main_figures']) {
   display: none !important;
 }
-
-#mainTabs .dropdown-menu > li:has(> a[data-value^='sc4_']:not([data-value$='_main_figures'])),
-#mainTabs .dropdown-menu > li:has(> a[data-value^='sc5_']:not([data-value$='_main_figures'])),
-#mainTabs .dropdown-menu > li:has(> a[data-value^='sc6_']:not([data-value$='_main_figures'])),
-#mainTabs .dropdown-menu > li:has(> a[data-value^='sc7_']:not([data-value$='_main_figures'])) {
-  display: none !important;
-}
-
 
 :root{
   --nav-total-h: 120px;   /* fallbacks; JS overwrites */
@@ -286,6 +282,13 @@ h4 {
   box-shadow:
     0 10px 30px rgba(16,24,40,.08),
     0 1px 0 rgba(16,24,40,.04) inset;
+}
+
+@supports (min-height: 100dvh) {
+  .container .tab-content,
+  .container-fluid .tab-content {
+    min-height: calc(100dvh - var(--nav-total-h) - 32px);
+  }
 }
 
 html[data-theme='dark'] .container .tab-content,
@@ -427,11 +430,6 @@ html[data-theme='dark'] .container-fluid .tab-content{
 
 #mainTabs a[data-value='patch_notes'],
 #mainTabs a[href='#patch_notes']{
-  display: none !important;
-}
-
-#mainTabs > li:has(> a[data-value='patch_notes']),
-#mainTabs > li:has(> a[href='#patch_notes']){
   display: none !important;
 }
 

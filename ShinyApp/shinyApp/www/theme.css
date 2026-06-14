@@ -396,13 +396,6 @@ html,
   ry: 6;
 }
 
-/* Highlight from server message */
-.btn-highlight {
-  stroke: #007bff !important;
-  stroke-width: 2px !important;
-  fill: rgba(0, 123, 255, 0.15) !important;
-}
-
 /* add to style.css */
 .cell-btn:hover { stroke: #06b6d4; stroke-width: 1px; }
 
@@ -651,6 +644,12 @@ html[data-theme='dark'] .tooltip.right .tooltip-arrow {
   flex-direction: column;
 }
 
+@supports (max-height: 100dvh) {
+  .modal-dialog.spg-modal .modal-content {
+    max-height: calc(100dvh - 72px);
+  }
+}
+
 .modal-dialog.spg-modal .modal-header,
 .modal-dialog.spg-modal .modal-footer {
   background: transparent;
@@ -667,7 +666,15 @@ html[data-theme='dark'] .tooltip.right .tooltip-arrow {
   background: transparent;
   color: inherit;
   max-height: calc(100vh - 220px);
-  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@supports (max-height: 100dvh) {
+  .modal-dialog.spg-modal .modal-body {
+    max-height: calc(100dvh - 220px);
+  }
 }
 
 .modal-dialog.spg-modal .btn.spg-modal-close {
@@ -877,6 +884,14 @@ html[data-theme='dark'] .modal-dialog.spg-modal .btn.spg-modal-close:focus-visib
   color: inherit;
   max-height: calc(100vh - 220px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@supports (max-height: 100dvh) {
+  .modal-dialog.ra-download-modal .modal-body {
+    max-height: calc(100dvh - 220px);
+  }
 }
 
 .ra-download-modal-body {
@@ -936,12 +951,25 @@ html[data-theme='dark'] .modal-dialog.ra-download-modal .ra-download-entry-title
     max-height: calc(100vh - 24px);
   }
 
+  @supports (max-height: 100dvh) {
+    .modal-dialog.spg-modal .modal-content {
+      max-height: calc(100dvh - 24px);
+    }
+  }
+
   .modal-dialog.spg-modal .modal-body {
     max-height: calc(100vh - 180px);
   }
 
   .modal-dialog.ra-download-modal .modal-body {
     max-height: calc(100vh - 180px);
+  }
+
+  @supports (max-height: 100dvh) {
+    .modal-dialog.spg-modal .modal-body,
+    .modal-dialog.ra-download-modal .modal-body {
+      max-height: calc(100dvh - 180px);
+    }
   }
 
   .spg-modal-gene-table {
