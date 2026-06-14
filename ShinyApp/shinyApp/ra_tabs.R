@@ -182,6 +182,110 @@ ra_taglist <- function(...) {
   do.call(tagList, nodes)
 }
 
+default_cell_type_choice <- function(conf, grouped_choices, fallback = NULL) {
+  if (!length(grouped_choices)) {
+    return("")
+  }
+
+  fallback_value <- as.character(fallback)[1]
+  if (is.na(fallback_value) || !nzchar(fallback_value)) {
+    fallback_value <- grouped_choices[1]
+  }
+
+  choice <- resolve_ui_from_id(
+    conf,
+    preferred_ids = c("correct_cellTypes", "correct_cellType", "cellTypes", "cellType"),
+    fallback = fallback_value
+  )
+
+  if (is.na(choice) || !nzchar(choice) || !choice %in% grouped_choices) {
+    if (!is.na(fallback_value) && nzchar(fallback_value) && fallback_value %in% grouped_choices) {
+      return(fallback_value)
+    }
+    return(grouped_choices[1])
+  }
+
+  choice
+}
+
+dataset_secondary_nav_specs <- list(
+  list(title = "Main Figures", suffix = "main_figures"),
+  list(title = "CellInfo vs GeneExpr", suffix = "cellinfo_gene"),
+  list(title = "Multiple GeneExpr", suffix = "multiple_geneexpr"),
+  list(title = "Gene coexpression", suffix = "gene_coexpression"),
+  list(title = "Violinplot / Boxplot", suffix = "violin_boxplot"),
+  list(title = "Proportion plot", suffix = "proportion_plot"),
+  list(title = "Bubbleplot / Heatmap", suffix = "bubble_heatmap")
+)
+
+build_dataset_secondary_nav <- function(prefix, active_suffix) {
+  if (!prefix %in% c("sc3", "sc4", "sc5", "sc6", "sc7")) {
+    return(NULL)
+  }
+
+  links <- lapply(dataset_secondary_nav_specs, function(nav_spec) {
+    tab_value <- paste0(prefix, "_", nav_spec$suffix)
+    classes <- c("subset-secondary-link")
+    if (identical(nav_spec$suffix, active_suffix)) {
+      classes <- c(classes, "is-active")
+    }
+
+    tags$a(
+      class = paste(classes, collapse = " "),
+      href = paste0("#", tab_value),
+      role = "button",
+      `data-target-tab` = tab_value,
+      `aria-current` = if (identical(nav_spec$suffix, active_suffix)) "page" else NULL,
+      onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+      nav_spec$title
+    )
+  })
+
+  tags$nav(
+    class = "subset-secondary-nav",
+    `aria-label` = "Subset page navigation",
+    tags$div(class = "subset-secondary-nav-inner", links)
+  )
+}
+
+main_figures_explanation_text <- function(prefix) {
+  switch(
+    prefix,
+    sc3 = "The Full Atlas Main Figures tab presents the full single-nuclei dataset as two UMAP panels: an overview colored by annotated cell type, and the same embedding split by seminiferous tubule stage (I-XII) to reveal how populations shift across the spermatogenic cycle. Users can selectively highlight any combination of cell groups - from germ cell populations (Aund through El16) and stage-stratified Sertoli cells (SC_I-VIII through SC_All_Stages) to somatic populations (PTM, Leydig, Macrophage) - and adjust point size and cell labels before exporting publication-ready figures.",
+    sc4 = "The Sertoli Subset section provides a focused view of Sertoli cells isolated from the broader Full Atlas dataset. The Main Figures tab displays a UMAP colored by cell type (showing Sertoli stage subsets SC_I-VIII, SC_VII-VIII, SC_IX-XII, SC_XI-VI, and SC_All_Stages) alongside stage-split UMAP panels, revealing how Sertoli cell transcriptional states vary across the spermatogenic cycle. Additional views within this subset - including gene expression overlays, violin/boxplots, proportion plots, and bubble/heatmaps - allow deep exploration of Sertoli-specific gene programs, making this subset particularly useful for investigating how Sertoli cells support germ cell development in a stage-dependent manner.",
+    sc5 = "The Spermatogonia Subset focuses on the earliest germ cells in the spermatogenic lineage, capturing populations from undifferentiated spermatogonia (Aund) through the differentiating spermatogonial types (A1-2, A3-4, Ain, Type B) and into early preleptotene spermatocytes (ePL, lPL). The UMAP overview and stage-split panels highlight how these progenitor populations cluster and transition across tubule stages, while the full suite of interactive figure types (gene expression plots, pairwise comparisons, violin plots, proportion plots, and heatmaps) enables users to interrogate the molecular programs that distinguish self-renewing from differentiating spermatogonia, including responses to niche signals such as GDNF and KITL.",
+    sc6 = "The Spermatocyte Subset covers the meiotic phase of spermatogenesis, encompassing cells from leptotene through diplotene/MI (L, L/Z, Z, PaI-VI, PaVII-VIII, PaIX-X, D/MI). The UMAP for this subset reveals a distinctive arc-like or continuum structure reflecting the ordered progression through meiotic prophase I and beyond, with stage-split panels showing which meiotic substages predominate at each tubule stage (I-XII). The interactive tools available within this subset support exploration of meiosis-specific gene programs, including synaptonemal complex components, DNA repair machinery, and recombination-related transcripts, across both cell identity and stage dimensions.",
+    sc7 = "The Spermatid Subset encompasses the post-meiotic phase of spermatogenesis, covering round and elongating spermatid populations from Rd1 through El16. The UMAP for this subset reveals distinct clusters corresponding to progressive stages of spermiogenesis - including the dramatic morphological and transcriptional remodeling associated with acrosome formation, nuclear elongation, and flagellum assembly - with stage-split panels linking each population to its corresponding tubule stage context. The full set of interactive figure types available within this subset allows users to trace the expression dynamics of spermatid-specific genes across this extended differentiation continuum, making it a valuable resource for studying the transcriptional programs that underpin sperm head and tail development.",
+    NULL
+  )
+}
+
+build_main_figures_explanation_box <- function(prefix) {
+  explanation_text <- main_figures_explanation_text(prefix)
+  if (is.null(explanation_text) || !nzchar(explanation_text)) {
+    return(NULL)
+  }
+
+  tags$div(
+    class = "figure-expl-wrap",
+    tags$details(
+      class = "figure-expl-details",
+      tags$summary(
+        tags$span(class = "fa fa-circle-info", `aria-hidden` = "true"),
+        "Figure Explanation"
+      ),
+      tags$div(
+        class = "home-card glass-card figure-expl-card",
+        tags$p(
+          class = "ra-sub",
+          style = "margin-bottom:0;",
+          explanation_text
+        )
+      )
+    )
+  )
+}
+
 ordered_dimred_choices <- function(conf) {
   dr_mask <- !is.na(conf$dimred) & conf$dimred
   dr_choices <- conf$UI[dr_mask]
@@ -283,6 +387,14 @@ build_common_controls <- function(prefix, block, conf, def) {
             choices = c("Small", "Medium", "Large"),
             selected = "Medium",
             inline = TRUE
+          )
+        ),
+        tags$div(
+          class = "ra-field-checkbox",
+          checkboxInput(
+            inputId = make_id("leg"),
+            label = "Show legend",
+            value = TRUE
           )
         ),
         ra_field(
@@ -519,9 +631,15 @@ build_main_figures_download_entries <- function(prefix) {
 
 build_cellinfo_stats_output <- function(prefix,
                                         block,
-                                        selected = "Decile") {
+                                        selected = "Decile",
+                                        include_split = TRUE,
+                                        table_wrap_class = NULL) {
   make_id <- function(part) paste0(prefix, block, part)
   toggle_id <- make_id("stats_toggle")
+  table_output <- dataTableOutput(make_id(".dt"), width = "100%")
+  if (!is.null(table_wrap_class) && nzchar(table_wrap_class)) {
+    table_output <- tags$div(class = table_wrap_class, table_output)
+  }
   tags$div(
     class = "ra-rowgroup",
     tags$div(
@@ -539,17 +657,21 @@ build_cellinfo_stats_output <- function(prefix,
     ),
     conditionalPanel(
       condition = sprintf("input.%s %% 2 == 1", toggle_id),
-      ra_field(
-        "Split continuous cell info into",
-        radioButtons(
-          inputId = make_id("splt"),
-          label = NULL,
-          choices = c("Quartile", "Decile"),
-          selected = selected,
-          inline = TRUE
+      if (isTRUE(include_split)) {
+        ra_field(
+          "Split continuous cell info into",
+          radioButtons(
+            inputId = make_id("splt"),
+            label = NULL,
+            choices = c("Quartile", "Decile"),
+            selected = selected,
+            inline = TRUE
+          )
         )
-      ),
-      dataTableOutput(make_id(".dt"))
+      } else {
+        NULL
+      },
+      table_output
     )
   )
 }
@@ -671,12 +793,14 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
 
   content <- tags$div(
     class = sprintf("legacy-stack %s-mainfig-stack", prefix),
+    build_dataset_secondary_nav(prefix, "main_figures"),
     tags$div(
       class = "legacy-pane mainfig-pane",
       controls_card,
       main_plot_card
     ),
-    split_plot_card
+    split_plot_card,
+    build_main_figures_explanation_box(prefix)
   )
 
   if (as_tab) {
@@ -756,6 +880,7 @@ build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TR
 
   content <- tags$div(
     class = sprintf("legacy-stack %s-cellinfo-gene-stack", prefix),
+    build_dataset_secondary_nav(prefix, "cellinfo_gene"),
     advanced_card,
     tags$div(
       class = sprintf("ra-pane legacy-pane %s-cellinfo-gene", prefix),
@@ -768,6 +893,231 @@ build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TR
     tabPanel(
       title = HTML("CellInfo vs GeneExpr"),
       value = sprintf("%s_cellinfo_gene", prefix),
+      content
+    )
+  } else {
+    content
+  }
+}
+
+build_multiple_geneexpr_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
+  make_id <- function(part) paste0(prefix, "m1", part)
+  grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
+  default_group <- resolve_ui_from_id(
+    conf,
+    preferred_ids = c("correct_cellTypes", "correct_cellType", "cellTypes", "cellType"),
+    fallback = as.character(def$grp1)[1]
+  )
+  if (!length(grouped_choices)) {
+    grouped_choices <- character(0)
+    default_group <- ""
+  } else if (is.na(default_group) || !nzchar(default_group) || !default_group %in% grouped_choices) {
+    fallback_group <- as.character(def$grp1)[1]
+    if (!is.na(fallback_group) && nzchar(fallback_group) && fallback_group %in% grouped_choices) {
+      default_group <- fallback_group
+    } else {
+      default_group <- grouped_choices[1]
+    }
+  }
+
+  gene_group <- ra_rowgroup(
+    "Gene selection",
+    ra_field(
+      "Genes",
+      selectizeInput(
+        inputId = make_id("genes"),
+        label = NULL,
+        choices = NULL,
+        selected = as.character(def$gene1)[1],
+        multiple = TRUE,
+        options = list(placeholder = "Type one or more gene names")
+      ) %>%
+        helper(
+          type = "inline",
+          size = "m",
+          fade = TRUE,
+          title = "Gene expression to include in the dotplot",
+          content = c(
+            "Select or type one or more genes",
+            "- Separate entries with Enter, comma, semicolon, or newline",
+            "- Use the upload button to populate this list from a CSV file"
+          )
+        )
+    ),
+    ra_button_row(
+      actionButton(
+        inputId = make_id("upload_open"),
+        label = "Upload Gene List",
+        class = "btn btn-primary btn-sm"
+      )
+    )
+  )
+
+  grouping_group <- ra_rowgroup(
+    "Grouping",
+    ra_field(
+      "Cell groups (X-axis)",
+      selectInput(
+        inputId = make_id("grp"),
+        label = NULL,
+        choices = grouped_choices,
+        selected = default_group
+      )
+    )
+  )
+
+  subset_group <- ra_rowgroup(
+    "Subset cells",
+    ra_field(
+      "Cell information to subset",
+      selectInput(
+        inputId = make_id("sub1"),
+        label = NULL,
+        choices = grouped_choices,
+        selected = default_group
+      )
+    ),
+    uiOutput(make_id("sub1.ui")),
+    ra_button_row(
+      actionButton(
+        inputId = make_id("sub1all"),
+        label = "Select all groups",
+        class = "btn btn-primary btn-sm"
+      ),
+      actionButton(
+        inputId = make_id("sub1non"),
+        label = "Deselect all groups",
+        class = "btn btn-outline-secondary btn-sm"
+      )
+    )
+  )
+
+  display_group <- ra_rowgroup(
+    "Display options",
+    ra_field(
+      "Plot size",
+      radioButtons(
+        inputId = make_id("psz"),
+        label = NULL,
+        choices = c("Small", "Medium", "Large"),
+        selected = "Medium",
+        inline = TRUE
+      )
+    ),
+    ra_field(
+      "Font size",
+      radioButtons(
+        inputId = make_id("fsz"),
+        label = NULL,
+        choices = c("Small", "Medium", "Large"),
+        selected = "Large",
+        inline = TRUE
+      )
+    ),
+    ra_field(
+      "Dot size",
+      sliderInput(
+        inputId = make_id("dsz"),
+        label = NULL,
+        min = 0.5,
+        max = 6,
+        value = 3,
+        step = 0.25
+      )
+    ),
+    tags$div(
+      class = "ra-field-checkbox",
+      checkboxInput(
+        inputId = make_id("leg"),
+        label = "Show legend",
+        value = TRUE
+      )
+    )
+  )
+
+  base_content <- ra_taglist(gene_group, grouping_group)
+  advanced_content <- ra_taglist(subset_group, display_group)
+
+  adv_toggle_id <- make_id("adv")
+  advanced_card <- if (!is.null(advanced_content)) {
+    tags$div(
+      class = "ra-card ra-controls glass-card legacy-advanced legacy-advanced-two-col",
+      ra_card_head(
+        "Toggle Advanced Controls",
+        "Subset cells and adjust dotplot display settings.",
+        tags$div(
+          class = "legacy-advanced-toggle",
+          actionButton(
+            inputId = adv_toggle_id,
+            label = NULL,
+            class = "btn btn-outline-primary ra-advanced-toggle",
+            icon = icon("chevron-down")
+          )
+        )
+      ),
+      conditionalPanel(
+        condition = sprintf("input.%s %% 2 == 1", adv_toggle_id),
+        tags$div(
+          class = "legacy-advanced-body legacy-advanced-two-col-body",
+          advanced_content
+        )
+      )
+    )
+  } else {
+    NULL
+  }
+
+  base_card <- tags$div(
+    class = "ra-card ra-controls glass-card legacy-controls",
+    ra_card_head(
+      sprintf("%s Multiple GeneExpr Controls", dataset_name),
+      "Select multiple genes, grouping, and subset filters."
+    ),
+    tags$p(
+      class = "ra-subtext",
+      "Compare expression of multiple genes across selected cell groups."
+    ),
+    base_content,
+    ra_download_modal_section(make_id("downloads_open"))
+  )
+
+  plot_card <- tags$div(
+    class = "ra-card ra-plot glass-card legacy-plots",
+    ra_card_head(
+      sprintf("%s Multiple GeneExpr", dataset_name),
+      "Dotplot and expression statistics for selected genes."
+    ),
+    ra_rowgroup(
+      "Dotplot",
+      h4(htmlOutput(make_id("oupTxt"))),
+      tags$div(
+        class = "ra-plot-holder",
+        uiOutput(make_id("oup.ui"))
+      )
+    ),
+    build_cellinfo_stats_output(
+      prefix,
+      "m1",
+      include_split = FALSE,
+      table_wrap_class = "legacy-table-scroll-wrap"
+    )
+  )
+
+  content <- tags$div(
+    class = sprintf("legacy-stack %s-multi-gene-stack", prefix),
+    build_dataset_secondary_nav(prefix, "multiple_geneexpr"),
+    advanced_card,
+    tags$div(
+      class = sprintf("ra-pane legacy-pane %s-multi-gene", prefix),
+      base_card,
+      plot_card
+    )
+  )
+
+  if (as_tab) {
+    tabPanel(
+      title = HTML("Multiple GeneExpr"),
+      value = sprintf("%s_multiple_geneexpr", prefix),
       content
     )
   } else {
@@ -944,6 +1294,7 @@ build_gene_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) 
 build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "d1", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
+  default_cell_group <- default_cell_type_choice(conf, grouped_choices, fallback = def$grp1)
 
   gene_group <- ra_rowgroup(
     "Gene list",
@@ -977,7 +1328,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("grp"),
         label = NULL,
         choices = grouped_choices,
-        selected = grouped_choices[1]
+        selected = default_cell_group
       ) %>%
         helper(
           type = "inline",
@@ -1039,7 +1390,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("sub1"),
         label = NULL,
         choices = grouped_choices,
-        selected = def$grp1
+        selected = default_cell_group
       )
     ),
     uiOutput(make_id("sub1.ui")),
@@ -1086,6 +1437,14 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         choices = c("Small", "Medium", "Large"),
         selected = "Medium",
         inline = TRUE
+      )
+    ),
+    tags$div(
+      class = "ra-field-checkbox",
+      checkboxInput(
+        inputId = make_id("leg"),
+        label = "Show legend",
+        value = TRUE
       )
     )
   )
@@ -1154,6 +1513,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
 
   content <- tags$div(
     class = sprintf("legacy-stack %s-bubble-stack", prefix),
+    build_dataset_secondary_nav(prefix, "bubble_heatmap"),
     advanced_card,
     tags$div(
       class = sprintf("ra-pane legacy-pane %s-bubble", prefix),
@@ -1308,19 +1668,22 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
     ),
     tags$div(
       class = "coexpression-support-grid",
-      tags$div(
-        class = "coexpression-support-panel coexpression-support-legend",
-        ra_rowgroup(
-          "Legend",
-          tags$div(
-            class = "ra-plot-holder coexpression-legend-holder",
+      conditionalPanel(
+        condition = sprintf("input.%s", make_id("leg")),
+        tags$div(
+          class = "coexpression-support-panel coexpression-support-legend",
+          ra_rowgroup(
+            "Legend",
             tags$div(
-              class = "coexpression-legend-output-wrap",
-              sc_spinner_plot_output(
-                make_id("oup2"),
-                height = "300px",
-                width = "100%",
-                proxy.height = "300px"
+              class = "ra-plot-holder coexpression-legend-holder",
+              tags$div(
+                class = "coexpression-legend-output-wrap",
+                sc_spinner_plot_output(
+                  make_id("oup2"),
+                  height = "300px",
+                  width = "100%",
+                  proxy.height = "300px"
+                )
               )
             )
           )
@@ -1338,6 +1701,7 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
 
   content <- tags$div(
     class = sprintf("legacy-stack %s-coexpression-stack", prefix),
+    build_dataset_secondary_nav(prefix, "gene_coexpression"),
     advanced_card,
     tags$div(
       class = sprintf("ra-pane legacy-pane %s-coexpression", prefix),
@@ -1360,6 +1724,7 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
 build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "c1", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
+  default_cell_group <- default_cell_type_choice(conf, grouped_choices, fallback = def$grp1)
 
   inputs_group <- ra_rowgroup(
     "Value selection",
@@ -1369,7 +1734,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("inp1"),
         label = NULL,
         choices = grouped_choices,
-        selected = def$grp1
+        selected = default_cell_group
       ) %>%
         helper(
           type = "inline",
@@ -1430,7 +1795,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("sub1"),
         label = NULL,
         choices = grouped_choices,
-        selected = def$grp1
+        selected = default_cell_group
       )
     ),
     uiOutput(make_id("sub1.ui")),
@@ -1467,7 +1832,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("psz"),
         label = NULL,
         choices = c("Small", "Medium", "Large"),
-        selected = "Large",
+        selected = "Medium",
         inline = TRUE
       )
     ),
@@ -1477,8 +1842,16 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("fsz"),
         label = NULL,
         choices = c("Small", "Medium", "Large"),
-        selected = "Medium",
+        selected = "Small",
         inline = TRUE
+      )
+    ),
+    tags$div(
+      class = "ra-field-checkbox",
+      checkboxInput(
+        inputId = make_id("leg"),
+        label = "Show legend",
+        value = TRUE
       )
     )
   )
@@ -1545,6 +1918,7 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
 
   content <- tags$div(
     class = sprintf("legacy-stack %s-violin-stack", prefix),
+    build_dataset_secondary_nav(prefix, "violin_boxplot"),
     advanced_card,
     tags$div(
       class = sprintf("ra-pane legacy-pane %s-violin", prefix),
@@ -1567,6 +1941,33 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
 build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "c2", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
+  default_x <- resolve_ui_from_id(
+    conf,
+    preferred_ids = c("sample"),
+    fallback = as.character(def$grp2)[1]
+  )
+  default_group <- resolve_ui_from_id(
+    conf,
+    preferred_ids = c("correct_cellTypes", "correct_cellType", "cellTypes", "cellType"),
+    fallback = as.character(def$grp1)[1]
+  )
+  if (!length(grouped_choices)) {
+    grouped_choices <- character(0)
+    default_x <- ""
+    default_group <- ""
+  } else {
+    if (is.na(default_x) || !nzchar(default_x) || !default_x %in% grouped_choices) {
+      default_x <- grouped_choices[1]
+    }
+    if (is.na(default_group) || !nzchar(default_group) || !default_group %in% grouped_choices) {
+      fallback_group <- as.character(def$grp1)[1]
+      if (!is.na(fallback_group) && nzchar(fallback_group) && fallback_group %in% grouped_choices) {
+        default_group <- fallback_group
+      } else {
+        default_group <- grouped_choices[1]
+      }
+    }
+  }
 
   inputs_group <- ra_rowgroup(
     "Proportion inputs",
@@ -1576,7 +1977,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
         inputId = make_id("inp1"),
         label = NULL,
         choices = grouped_choices,
-        selected = def$grp2
+        selected = default_x
       ) %>%
         helper(
           type = "inline",
@@ -1595,7 +1996,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
         inputId = make_id("inp2"),
         label = NULL,
         choices = grouped_choices,
-        selected = def$grp1
+        selected = default_group
       ) %>%
         helper(
           type = "inline",
@@ -1675,6 +2076,14 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
         selected = "Medium",
         inline = TRUE
       )
+    ),
+    tags$div(
+      class = "ra-field-checkbox",
+      checkboxInput(
+        inputId = make_id("leg"),
+        label = "Show legend",
+        value = TRUE
+      )
     )
   )
 
@@ -1740,6 +2149,7 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
 
   content <- tags$div(
     class = sprintf("legacy-stack %s-proportion-stack", prefix),
+    build_dataset_secondary_nav(prefix, "proportion_plot"),
     advanced_card,
     tags$div(
       class = sprintf("ra-pane legacy-pane %s-proportion", prefix),

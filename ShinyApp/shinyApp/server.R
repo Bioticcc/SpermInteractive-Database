@@ -433,6 +433,31 @@ get_gene_index <- function(inpGene, gene_name) {
   as.integer(idx)
 }
 
+multiple_geneexpr_default_genes <- list(
+  sc3 = c("Zbtb16", "Meiob", "Acrv1", "Ddx4", "Gata1"),
+  sc4 = c("Zbtb16", "Meiob", "Acrv1", "Ddx4", "Gata1"),
+  sc5 = c("Zbtb16", "Meiob", "Acrv1", "Ddx4", "Gata1"),
+  sc6 = c("Zbtb16", "Meiob", "Acrv1", "Ddx4", "Gata1"),
+  sc7 = c("Zbtb16", "Meiob", "Acrv1", "Ddx4", "Gata1")
+)
+
+default_multiple_geneexpr_genes <- function(prefix, inpGene, fallback = NULL) {
+  gene_names <- names(inpGene)
+  defaults <- multiple_geneexpr_default_genes[[prefix]]
+  defaults <- defaults[defaults %in% gene_names]
+  if (length(defaults)) {
+    return(defaults)
+  }
+
+  fallback <- as.character(fallback)
+  fallback <- fallback[!is.na(fallback) & nzchar(fallback) & fallback %in% gene_names]
+  if (length(fallback)) {
+    return(fallback[[1]])
+  }
+
+  gene_names[seq_len(min(5, length(gene_names)))]
+}
+
 
 
 active_button <- reactiveVal(NULL)
@@ -928,9 +953,9 @@ scDRcoexNum <- function(inpConf, inpMeta, inp1, inp2,
 } 
  
 # Plot violin / boxplot 
-scVioBox <- function(inpConf, inpMeta, inp1, inp2, 
-                     inpsub1, inpsub2, inpH5, inpGene, 
-                     inptyp, inppts, inpsiz, inpfsz, dark_theme = FALSE){ 
+scVioBox <- function(inpConf, inpMeta, inp1, inp2,
+                     inpsub1, inpsub2, inpH5, inpGene,
+                     inptyp, inppts, inpsiz, inpfsz, show_legend = TRUE, dark_theme = FALSE){
   if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   sc_profile_note(
     selected_x = as.character(inp1),
@@ -995,7 +1020,7 @@ scVioBox <- function(inpConf, inpMeta, inp1, inp2,
     ggOut = ggOut + xlab(inp1) + ylab(inp2) +
       sctheme(base_size = sList[inpfsz], Xang = 45, XjusH = 1, dark = dark_theme) +
       scale_fill_manual("", values = ggCol) +
-      theme(legend.position = "none")
+      theme(legend.position = if (isTRUE(show_legend)) "right" else "none")
     ggOut
   })
   return(ggOut) 
@@ -1051,11 +1076,217 @@ scGeneList <- function(inp, inpGene){
   geneList[!gene %in% names(inpGene)]$present = FALSE 
   return(geneList) 
 } 
+
+scParseGeneVector <- function(inp_values, inpGene) {
+  values <- as.character(inp_values)
+  values <- values[!is.na(values)]
+  if (!length(values)) {
+    return(list(valid = character(0), missing = character(0), input = character(0)))
+  }
+
+  parsed <- trimws(unlist(strsplit(paste(values, collapse = "\n"), ",|;|\n")))
+  parsed <- parsed[!is.na(parsed) & nzchar(parsed)]
+  parsed <- unique(parsed)
+  if (!length(parsed)) {
+    return(list(valid = character(0), missing = character(0), input = character(0)))
+  }
+
+  available <- names(inpGene)
+  available <- available[!is.na(available) & nzchar(available)]
+  if (!length(available)) {
+    return(list(valid = character(0), missing = parsed, input = parsed))
+  }
+
+  available_lower <- tolower(available)
+  valid <- character(0)
+  missing <- character(0)
+
+  for (token in parsed) {
+    idx <- match(tolower(token), available_lower)
+    if (is.na(idx)) {
+      missing <- c(missing, token)
+    } else {
+      canonical <- available[[idx]]
+      if (!canonical %in% valid) {
+        valid <- c(valid, canonical)
+      }
+    }
+  }
+
+  list(valid = valid, missing = missing, input = parsed)
+}
+
+scDRnumMulti <- function(inpConf, inpMeta, inpGrp, inpGenes,
+                         inpsub1, inpsub2, inpH5, inpGene) {
+  if (is.null(inpsub1)) {
+    inpsub1 <- first_valid_ui(inpConf)
+  }
+
+  parsed_genes <- scParseGeneVector(inpGenes, inpGene)
+  gene_list <- parsed_genes$valid
+  shiny::validate(need(length(gene_list) > 0, "Select at least one valid gene to plot."))
+
+  grp_id <- inpConf[UI == inpGrp]$ID[1]
+  sub_id <- inpConf[UI == inpsub1]$ID[1]
+  shiny::validate(need(!is.na(grp_id) && nzchar(grp_id), "Grouping variable is unavailable for this dataset."))
+  shiny::validate(need(!is.na(sub_id) && nzchar(sub_id), "Subset variable is unavailable for this dataset."))
+
+  grp_vals <- inpMeta[[grp_id]]
+  sub_vals <- inpMeta[[sub_id]]
+
+  cell_keep <- rep(TRUE, nrow(inpMeta))
+  unique_sub <- unique(as.character(sub_vals))
+  unique_sub <- unique_sub[!is.na(unique_sub)]
+  if (length(inpsub2) != 0 && length(inpsub2) != length(unique_sub)) {
+    cell_keep <- as.character(sub_vals) %in% as.character(inpsub2)
+  }
+
+  grp_chr <- trimws(as.character(grp_vals))
+  grp_ok <- !is.na(grp_chr) & nzchar(grp_chr)
+  cell_keep <- cell_keep & grp_ok
+  shiny::validate(need(any(cell_keep), "No cells remain after subsetting."))
+
+  grp_levels <- if (is.factor(grp_vals)) levels(grp_vals) else unique(grp_chr[cell_keep])
+  grp_levels <- grp_levels[grp_levels %in% unique(grp_chr[cell_keep])]
+  if (!length(grp_levels)) {
+    grp_levels <- sort(unique(grp_chr[cell_keep]))
+  }
+  grouped_cells <- factor(grp_chr[cell_keep], levels = grp_levels)
+  n_cells_dt <- data.table(group = grouped_cells)[, .(nCells = .N), by = "group"]
+
+  chunks <- vector("list", length(gene_list))
+  for (i in seq_along(gene_list)) {
+    gene_name <- gene_list[[i]]
+    gene_idx <- get_gene_index(inpGene, gene_name)
+    expr_vals <- read_h5_gene(inpH5, gene_idx)[cell_keep]
+    expr_vals <- as.numeric(expr_vals)
+    expr_vals[!is.finite(expr_vals)] <- 0
+    expr_vals[expr_vals < 0] <- 0
+
+    gene_dt <- data.table(group = grouped_cells, expr = expr_vals)
+    agg <- gene_dt[, .(
+      nExpress = sum(expr > 0, na.rm = TRUE),
+      pctExpress = 100 * sum(expr > 0, na.rm = TRUE) / .N,
+      avgExpr = mean(expm1(expr), na.rm = TRUE)
+    ), by = "group"]
+    agg <- n_cells_dt[agg, on = "group"]
+    agg[is.na(nExpress), `:=`(nExpress = 0, pctExpress = 0, avgExpr = 0)]
+    agg[, gene := gene_name]
+    chunks[[i]] <- agg
+  }
+
+  dot_data <- rbindlist(chunks, use.names = TRUE)
+  dot_data[, group := factor(as.character(group), levels = grp_levels)]
+  dot_data[, gene := factor(gene, levels = rev(gene_list))]
+  dot_data[, avgExprLog := log1p(pmax(avgExpr, 0))]
+  dot_data[, avgExprScaled := if (uniqueN(avgExprLog) <= 1) 0 else as.numeric(scale(avgExprLog)), by = "gene"]
+  dot_data[!is.finite(avgExprScaled), avgExprScaled := 0]
+  dot_data[, avgExprScaled := pmax(pmin(avgExprScaled, 2.5), -2.5)]
+  setorder(dot_data, group, gene)
+
+  table_data <- dcast(
+    dot_data[, .(group, nCells, gene, nExpress, pctExpress)],
+    group + nCells ~ gene,
+    value.var = c("nExpress", "pctExpress")
+  )
+  table_data[, group := as.character(group)]
+  setorderv(table_data, "group")
+
+  list(
+    dot_data = dot_data,
+    table_data = table_data,
+    valid_genes = gene_list,
+    missing_genes = parsed_genes$missing
+  )
+}
+
+scMultiGeneDotPlot <- function(dot_data, inpfsz = "Medium", inpdotsz = 1, dark_theme = FALSE) {
+  shiny::validate(need(!is.null(dot_data) && nrow(dot_data) > 0, "No data available to plot."))
+
+  publication_rd_bu <- rev(
+    grDevices::colorRampPalette(RColorBrewer::brewer.pal(9, "RdBu"))(100)
+  )
+  axis_col <- if (dark_theme) "#e2e8f0" else "#1e293b"
+  bg_col <- if (dark_theme) "#050815" else "#ffffff"
+  border_col <- if (dark_theme) "#475569" else "#000000"
+  point_stroke <- if (dark_theme) "#f8fafc" else "#000000"
+  size_key <- as.character(inpfsz)[1]
+  if (is.na(size_key) || !nzchar(size_key) || !size_key %in% c("Small", "Medium", "Large")) {
+    size_key <- "Large"
+  }
+  base_size_map <- c(Small = 10, Medium = 12, Large = 14)
+  point_max_map <- c(Small = 4.0, Medium = 6.0, Large = 8.0)
+  legend_text_map <- c(Small = 8, Medium = 9, Large = 10)
+  legend_title_map <- c(Small = 8.5, Medium = 9.5, Large = 10.5)
+  axis_angle_map <- c(Small = 35, Medium = 40, Large = 45)
+  legend_scale <- 1.5
+
+  base_size <- base_size_map[[size_key]]
+  dot_scale <- suppressWarnings(as.numeric(inpdotsz)[1])
+  if (!is.finite(dot_scale) || dot_scale <= 0) {
+    dot_scale <- 1
+  }
+  point_max <- point_max_map[[size_key]] * dot_scale
+  legend_text_size <- legend_text_map[[size_key]] * legend_scale
+  legend_title_size <- legend_title_map[[size_key]] * legend_scale
+  axis_angle <- axis_angle_map[[size_key]]
+
+  ggplot(dot_data, aes(x = gene, y = group)) +
+    geom_point(
+      aes(size = pctExpress, fill = avgExprScaled),
+      shape = 21, stroke = 0.25, color = point_stroke
+    ) +
+    scale_fill_gradientn(
+      colors = publication_rd_bu,
+      values = scales::rescale(c(-2.5, 0, 2.5)),
+      limits = c(-2.5, 2.5),
+      oob = scales::squish
+    ) +
+    scale_size(range = c(0, point_max), limits = c(0, 100), breaks = c(0, 25, 50, 75, 100)) +
+    theme_minimal(base_size = base_size) +
+    theme(
+      panel.background = element_rect(fill = bg_col, colour = NA),
+      plot.background = element_rect(fill = bg_col, colour = NA),
+      panel.grid = element_blank(),
+      axis.text.x = element_text(color = axis_col, angle = axis_angle, hjust = 1, vjust = 1),
+      axis.text.y = element_text(color = axis_col),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      panel.border = element_rect(color = border_col, fill = NA, size = 1),
+      axis.ticks = element_line(color = border_col, size = 0.5),
+      axis.ticks.length = unit(0.25, "cm"),
+      legend.position = "right",
+      legend.direction = "vertical",
+      legend.box = "vertical",
+      legend.key.height = unit(0.28 * legend_scale, "cm"),
+      legend.key.width = unit(0.9 * legend_scale, "cm"),
+      legend.background = element_blank(),
+      legend.box.background = element_rect(fill = bg_col, colour = border_col),
+      legend.text = element_text(color = axis_col, size = legend_text_size),
+      legend.title = element_text(color = axis_col, size = legend_title_size),
+      legend.margin = margin(t = 3, r = 4, b = 3, l = 4),
+      legend.spacing.y = unit(0.10 * legend_scale, "cm")
+    ) +
+    guides(
+      fill = guide_colorbar(
+        title = "Average Expression",
+        direction = "vertical",
+        barheight = unit(2.6 * legend_scale, "cm"),
+        barwidth = unit(0.2 * legend_scale, "cm"),
+        order = 1
+      ),
+      size = guide_legend(
+        title = "Percent Expressed",
+        order = 2
+      )
+    ) +
+    coord_flip()
+}
  
 # Plot gene expression bubbleplot / heatmap 
-scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt, 
-                       inpsub1, inpsub2, inpH5, inpGene, inpScl, inpRow, inpCol, 
-                       inpcols, inpfsz, save = FALSE, dark_theme = FALSE){ 
+scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
+                       inpsub1, inpsub2, inpH5, inpGene, inpScl, inpRow, inpCol,
+                       inpcols, inpfsz, save = FALSE, show_legend = TRUE, dark_theme = FALSE){
   if(is.null(inpsub1)){inpsub1 = first_valid_ui(inpConf)} 
   # Identify genes that are in our dataset 
   geneList = scGeneList(inp, inpGene) 
@@ -1129,6 +1360,7 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
     ggMat = as.matrix(ggMat[, -1, with = FALSE])
     rownames(ggMat) = tmp
     ggMat[!is.finite(ggMat)] <- 0
+    dendro_col <- if (isTRUE(dark_theme)) "#e2e8f0" else "#111827"
     row_cluster_ok <- FALSE
     ggRow <- NULL
     if(isTRUE(inpRow) && nrow(ggMat) > 1){
@@ -1142,7 +1374,7 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
     }
     if(row_cluster_ok){
       ggRow = ggplot() + coord_flip() +
-        geom_segment(data = hcRow$segments, aes(x=x,y=y,xend=xend,yend=yend)) +
+        geom_segment(data = hcRow$segments, aes(x=x,y=y,xend=xend,yend=yend), color = dendro_col, size = 0.35) +
         scale_y_continuous(expand = c(0, 0)) +
         scale_x_continuous(expand = c(0, 0.5)) +
         sctheme(base_size = sList[inpfsz], dark = dark_theme) +
@@ -1166,7 +1398,7 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
     }
     if(col_cluster_ok){
       ggCol = ggplot() +
-        geom_segment(data = hcCol$segments, aes(x=x,y=y,xend=xend,yend=yend)) +
+        geom_segment(data = hcCol$segments, aes(x=x,y=y,xend=xend,yend=yend), color = dendro_col, size = 0.35) +
         scale_x_continuous(expand = c(0.05, 0)) +
         scale_y_continuous(expand = c(0, 0)) +
         sctheme(base_size = sList[inpfsz], Xang = 45, XjusH = 1, dark = dark_theme) +
@@ -1222,8 +1454,14 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
         )
     }
 
-    ggLeg = g_legend(ggOut)
-    ggOut = ggOut + theme(legend.position = "none")
+    ggLeg <- if (isTRUE(show_legend)) {
+      g_legend(ggOut)
+    } else {
+      grid::nullGrob()
+    }
+    ggOut <- ggOut +
+      theme(legend.position = "none") +
+      guides(color = "none", fill = "none", size = "none")
     empty_grob <- grid::nullGrob()
     ggOut <- ggplotGrob(ggOut)
     top_grob <- if (col_cluster_ok) ggplotGrob(ggCol) else empty_grob
@@ -1240,7 +1478,7 @@ scBubbHeat <- function(inpConf, inpMeta, inp, inpGrp, inpPlt,
     }
     assembled_args <- list(
       grobs = list(ggOut, ggLeg, top_grob, right_grob, empty_grob, empty_grob),
-      widths = c(7, 1),
+      widths = c(7, if (isTRUE(show_legend)) 1 else 0.05),
       heights = c(1, 7, 2),
       layout_matrix = rbind(c(3, 5), c(1, 4), c(2, 6))
     )
@@ -1394,6 +1632,33 @@ shinyServer(function(input, output, session) {
     )
   }
 
+  update_spg_gene_input <- function(genes) {
+    genes <- unique(as.character(genes))
+    genes <- genes[nzchar(genes)]
+    selected <- isolate(input$gene_search)
+    if (!is.null(initial_query[["gene_search"]])) {
+      selected <- initial_query[["gene_search"]]
+    }
+    if (is.null(selected) || !length(selected) || !nzchar(selected[[1]])) {
+      selected <- character(0)
+    }
+
+    updateSelectizeInput(
+      session,
+      "gene_search",
+      choices = genes,
+      selected = selected,
+      server = TRUE,
+      options = list(
+        placeholder = "Type a gene…",
+        create = TRUE,
+        persist = FALSE,
+        maxOptions = 20,
+        openOnFocus = FALSE
+      )
+    )
+  }
+
   ensure_spg_assets <- function(show_progress = TRUE) {
     if (isTRUE(ra_assets_ready$spg)) {
       return(TRUE)
@@ -1406,7 +1671,9 @@ shinyServer(function(input, output, session) {
     } else {
       get_spg_avg_expr()
     }
+    spg_mat <- get_spg_avg_expr()
     ra_assets_ready$spg <- TRUE
+    update_spg_gene_input(rownames(spg_mat))
     TRUE
   }
 
@@ -2725,6 +2992,98 @@ shinyServer(function(input, output, session) {
     paste0(custom_value, extension)
   }
 
+  download_dimension <- function(input_id, default_value) {
+    value <- suppressWarnings(as.numeric(input[[input_id]]))
+    if (!length(value) || !is.finite(value) || value <= 0) {
+      return(default_value)
+    }
+    value
+  }
+
+  save_ggplot_pdf <- function(file, plot, width, height) {
+    grDevices::cairo_pdf(file, width = width, height = height, onefile = FALSE)
+    on.exit(grDevices::dev.off(), add = TRUE)
+    print(plot)
+  }
+
+  save_ggplot_png <- function(file, plot, width, height) {
+    ggplot2::ggsave(
+      filename = file,
+      plot = plot,
+      device = "png",
+      width = width,
+      height = height,
+      units = "in",
+      dpi = 300,
+      bg = "transparent"
+    )
+  }
+
+  bind_single_download_modal <- function(button_id,
+                                         figure_title,
+                                         pdf_id,
+                                         png_id,
+                                         filename_id,
+                                         height_id,
+                                         width_id,
+                                         height_value,
+                                         width_value,
+                                         intro = "Choose a file type and export size.") {
+    observeEvent(input[[button_id]], {
+      show_ra_download_modal(
+        entries = ra_download_entry(
+          pdf_id = pdf_id,
+          png_id = png_id,
+          height_id = height_id,
+          width_id = width_id,
+          height_value = height_value,
+          width_value = width_value,
+          title = figure_title,
+          filename_id = filename_id
+        ),
+        intro = intro
+      )
+    }, ignoreInit = TRUE)
+  }
+
+  bind_single_download_modal(
+    button_id = "ra_dot_downloads_open",
+    figure_title = "Retinoic Acid dotplot",
+    pdf_id = "ra_dotplot_pdf",
+    png_id = "ra_dotplot_png",
+    filename_id = "ra_dotplot_name",
+    height_id = "ra_dotplot_h",
+    width_id = "ra_dotplot_w",
+    height_value = 7.5,
+    width_value = 12
+  )
+
+  bind_single_download_modal(
+    button_id = "ra_line_downloads_open",
+    figure_title = "Retinoic Acid lineplot",
+    pdf_id = "ra_lineplot_pdf",
+    png_id = "ra_lineplot_png",
+    filename_id = "ra_lineplot_name",
+    height_id = "ra_lineplot_h",
+    width_id = "ra_lineplot_w",
+    height_value = 7.5,
+    width_value = 12
+  )
+
+  observeEvent(input$ccc_downloads_open, {
+    show_ra_download_modal(
+      title = "Figure downloads",
+      intro = NULL,
+      entries = tags$div(
+        class = "ra-download-entry",
+        tags$p(
+          class = "ra-sub",
+          "To download this figure, please hover over the plot to the right, and click the small camera icon to download it as a png."
+        )
+      )
+    )
+  }, ignoreInit = TRUE)
+
   bind_main_figures <- function(prefix, get_conf, get_meta) {
     make_id <- function(part) paste0(prefix, "mf", part)
     get_target_ui <- function() {
@@ -3040,6 +3399,34 @@ shinyServer(function(input, output, session) {
                                      get_gene,
                                      gexpr_path) {
     make_id <- function(part) paste0(prefix, part)
+    legend_enabled <- function(block, default = TRUE) {
+      input_id <- make_id(paste0(block, "leg"))
+      value <- input[[input_id]]
+      if (is.null(value)) {
+        return(isTRUE(default))
+      }
+      isTRUE(value)
+    }
+    apply_legend_visibility <- function(plot_obj, block, default = TRUE) {
+      if (legend_enabled(block, default)) {
+        return(plot_obj)
+      }
+      if (inherits(plot_obj, c("gg", "ggplot"))) {
+        return(
+          plot_obj +
+            ggplot2::theme(legend.position = "none") +
+            ggplot2::guides(
+              color = "none",
+              fill = "none",
+              size = "none",
+              shape = "none",
+              linetype = "none",
+              alpha = "none"
+            )
+        )
+      }
+      plot_obj
+    }
 
     optCrt_local <- "{ option_create: function(data,escape) {return('<div class=\\\"create\\\"><strong>' + '</strong></div>');} }"
     choose_violin_y <- function(current, conf, def, genes) {
@@ -3142,6 +3529,12 @@ shinyServer(function(input, output, session) {
       if (identical(suffix, "cellinfo_gene")) {
         def <- get_def()
         update_gene_selectize(make_id("a1inp2"), def$gene1)
+      } else if (identical(suffix, "multiple_geneexpr")) {
+        def <- get_def()
+        update_gene_selectize(
+          make_id("m1genes"),
+          default_multiple_geneexpr_genes(prefix, get_gene(), def$gene1)
+        )
       } else if (identical(suffix, "gene_gene")) {
         def <- get_def()
         update_gene_selectize(make_id("a3inp1"), def$gene1)
@@ -3217,6 +3610,7 @@ shinyServer(function(input, output, session) {
     }
 
     bind_subset_controls("a1")
+    bind_subset_controls("m1")
     bind_subset_controls("a2")
     bind_subset_controls("a3")
     bind_subset_controls("b2")
@@ -3241,6 +3635,14 @@ shinyServer(function(input, output, session) {
         tagList(
           build_plot_download_entry(prefix, "a1", "1", "Cell information overlay", 6, 8),
           build_plot_download_entry(prefix, "a1", "2", "Gene expression overlay", 6, 8)
+        )
+      }
+    )
+    bind_download_modal(
+      "m1downloads_open",
+      function() {
+        tagList(
+          build_plot_download_entry(prefix, "m1", "", "Multiple GeneExpr dotplot", 8, 10)
         )
       }
     )
@@ -3299,25 +3701,329 @@ shinyServer(function(input, output, session) {
       choose_violin_y(input[[make_id("c1inp2")]], get_conf(), get_def(), get_gene())
     })
 
-    # ---- Tab a1: CellInfo vs GeneExpr ----
-    output[[make_id("a1oup1")]] <- renderPlot({
-      with_dark(
-        scDRcell,
+    multi_gene_upload_status <- reactiveVal(NULL)
+    set_multi_gene_upload_status <- function(message = NULL, type = "info") {
+      if (is.null(message) || !nzchar(trimws(as.character(message)))) {
+        multi_gene_upload_status(NULL)
+      } else {
+        multi_gene_upload_status(list(message = as.character(message), type = as.character(type)))
+      }
+      invisible(NULL)
+    }
+
+    output[[make_id("m1upload_status")]] <- renderUI({
+      status <- multi_gene_upload_status()
+      if (is.null(status)) {
+        return(NULL)
+      }
+      alert_class <- switch(
+        tolower(status$type),
+        error = "alert alert-danger",
+        warning = "alert alert-warning",
+        success = "alert alert-success",
+        "alert alert-info"
+      )
+      tags$div(
+        class = alert_class,
+        style = "margin-top:12px;",
+        status$message
+      )
+    })
+
+    observeEvent(input[[make_id("m1upload_open")]], {
+      set_multi_gene_upload_status(NULL)
+      show_ra_download_modal(
+        title = "Upload Gene List",
+        intro = "Upload a CSV file containing exactly one uniquely named column called GeneName. Values in GeneName will be used as selected genes.",
+        entries = tagList(
+          tags$div(
+            class = "ra-download-entry",
+            tags$div(class = "ra-download-entry-title", "CSV requirements"),
+            tags$ul(
+              style = "margin:10px 0 12px 18px;",
+              tags$li("File type must be .csv"),
+              tags$li("Header must contain one column named GeneName"),
+              tags$li("GeneName column name cannot be duplicated"),
+              tags$li("At least one valid gene name must be present")
+            ),
+            fileInput(
+              inputId = make_id("m1upload_file"),
+              label = "Gene list CSV",
+              accept = c(".csv", "text/csv", "text/comma-separated-values")
+            ),
+            actionButton(
+              inputId = make_id("m1upload_apply"),
+              label = "Use Uploaded Genes",
+              class = "ra-btn ra-download-btn ra-sidebar-action-btn"
+            ),
+            uiOutput(make_id("m1upload_status"))
+          )
+        )
+      )
+    }, ignoreInit = TRUE)
+
+    observeEvent(input[[make_id("m1upload_apply")]], {
+      upload <- input[[make_id("m1upload_file")]]
+      set_multi_gene_upload_status(NULL)
+
+      if (is.null(upload) || is.null(upload$datapath) || !nzchar(upload$datapath)) {
+        set_multi_gene_upload_status("Please choose a CSV file before applying.", "error")
+        return()
+      }
+
+      ext <- tolower(tools::file_ext(upload$name %||% ""))
+      if (!identical(ext, "csv")) {
+        set_multi_gene_upload_status("Uploaded file must be a CSV (.csv).", "error")
+        return()
+      }
+
+      csv_data <- tryCatch(
+        read.csv(upload$datapath, stringsAsFactors = FALSE, check.names = FALSE),
+        error = function(e) e
+      )
+      if (inherits(csv_data, "error")) {
+        set_multi_gene_upload_status(
+          sprintf("Unable to read CSV file: %s", conditionMessage(csv_data)),
+          "error"
+        )
+        return()
+      }
+
+      col_names <- names(csv_data)
+      col_names <- trimws(sub("^\ufeff", "", col_names))
+      gene_col_matches <- which(col_names == "GeneName")
+      if (!length(gene_col_matches)) {
+        set_multi_gene_upload_status("CSV is missing the required GeneName column.", "error")
+        return()
+      }
+      if (length(gene_col_matches) > 1) {
+        set_multi_gene_upload_status("CSV contains duplicate GeneName columns. Keep exactly one.", "error")
+        return()
+      }
+
+      uploaded_genes <- trimws(as.character(csv_data[[gene_col_matches[[1]]]]))
+      uploaded_genes <- uploaded_genes[!is.na(uploaded_genes) & nzchar(uploaded_genes)]
+      uploaded_genes <- unique(uploaded_genes)
+      if (!length(uploaded_genes)) {
+        set_multi_gene_upload_status("No valid gene names were provided in GeneName.", "error")
+        return()
+      }
+
+      parsed <- scParseGeneVector(uploaded_genes, get_gene())
+      if (!length(parsed$valid)) {
+        set_multi_gene_upload_status("No valid gene names were provided in GeneName.", "error")
+        return()
+      }
+
+      update_gene_selectize(make_id("m1genes"), parsed$valid)
+      removeModal()
+
+      if (length(parsed$missing)) {
+        showNotification(
+          sprintf(
+            "Loaded %d gene(s). Ignored %d not found in this dataset.",
+            length(parsed$valid),
+            length(parsed$missing)
+          ),
+          type = "warning",
+          duration = 8
+        )
+      } else {
+        showNotification(
+          sprintf("Loaded %d gene(s) from GeneName.", length(parsed$valid)),
+          type = "message",
+          duration = 5
+        )
+      }
+    }, ignoreInit = TRUE)
+
+    output[[make_id("m1oupTxt")]] <- renderUI({
+      parsed <- scParseGeneVector(input[[make_id("m1genes")]], get_gene())
+      if (!length(parsed$input)) {
+        return(HTML("Select genes manually or upload a CSV list."))
+      }
+      if (!length(parsed$valid)) {
+        return(HTML("No valid genes found in the current dataset."))
+      }
+
+      msg <- paste0(length(parsed$valid), " gene(s) selected")
+      if (length(parsed$missing)) {
+        preview <- paste(head(parsed$missing, 6), collapse = ", ")
+        if (length(parsed$missing) > 6) {
+          preview <- paste0(preview, ", ...")
+        }
+        msg <- paste0(
+          msg,
+          "<br/>",
+          length(parsed$missing),
+          " gene(s) not found in this dataset (",
+          preview,
+          ")"
+        )
+      }
+      HTML(msg)
+    })
+
+    m1_data <- reactive({
+      data <- scDRnumMulti(
         get_conf(),
         get_meta(),
-        input[[make_id("a1drX")]],
-        input[[make_id("a1drY")]],
-        input[[make_id("a1inp1")]],
-        input[[make_id("a1sub1")]],
-        input[[make_id("a1sub2")]],
-        input[[make_id("a1siz")]],
-        input[[make_id("a1col1")]],
-        input[[make_id("a1ord1")]],
-        input[[make_id("a1fsz")]],
-        input[[make_id("a1asp")]],
-        input[[make_id("a1txt")]],
-        input[[make_id("a1lab1")]],
-        stage_split = input[[make_id("a1split")]]
+        input[[make_id("m1grp")]],
+        input[[make_id("m1genes")]],
+        input[[make_id("m1sub1")]],
+        input[[make_id("m1sub2")]],
+        gexpr_path,
+        get_gene()
+      )
+      sc_profile_note(
+        selected_genes = as.character(data$valid_genes),
+        gene_count = length(data$valid_genes),
+        selected_grouping = as.character(input[[make_id("m1grp")]]),
+        selected_group_count = length(unique(as.character(data$table_data$group)))
+      )
+      data
+    })
+
+    output[[make_id("m1oup")]] <- renderPlot({
+      sc_profile_eval(prefix, "multiple_geneexpr_dotplot", {
+        plot_data <- m1_data()
+        apply_legend_visibility(
+          with_dark(
+            scMultiGeneDotPlot,
+            plot_data$dot_data,
+            input[[make_id("m1fsz")]],
+            input[[make_id("m1dsz")]]
+          ),
+          "m1"
+        )
+      })
+    })
+    output[[make_id("m1oup.ui")]] <- renderUI({
+      height <- pList2[input[[make_id("m1psz")]]]
+      sc_spinner_plot_output(make_id("m1oup"), height = height, proxy.height = height)
+    })
+    output[[make_id("m1oup.pdf")]] <- downloadHandler(
+      filename = function() download_name(
+        "m1oup.name",
+        paste0(prefix, "_multiple_geneexpr_", input[[make_id("m1grp")]]),
+        ".pdf"
+      ),
+      content = function(file) {
+        plot_data <- m1_data()
+        ggsave(
+          file,
+          device = "pdf",
+          height = input[[make_id("m1oup.h")]],
+          width = input[[make_id("m1oup.w")]],
+          useDingbats = FALSE,
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scMultiGeneDotPlot,
+              plot_data$dot_data,
+              input[[make_id("m1fsz")]],
+              input[[make_id("m1dsz")]]
+            ),
+            "m1"
+          )
+        )
+      }
+    )
+    output[[make_id("m1oup.png")]] <- downloadHandler(
+      filename = function() download_name(
+        "m1oup.name",
+        paste0(prefix, "_multiple_geneexpr_", input[[make_id("m1grp")]]),
+        ".png"
+      ),
+      content = function(file) {
+        plot_data <- m1_data()
+        ggsave(
+          file,
+          device = "png",
+          height = input[[make_id("m1oup.h")]],
+          width = input[[make_id("m1oup.w")]],
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scMultiGeneDotPlot,
+              plot_data$dot_data,
+              input[[make_id("m1fsz")]],
+              input[[make_id("m1dsz")]]
+            ),
+            "m1"
+          )
+        )
+      }
+    )
+
+    output[[make_id("m1.dt")]] <- renderDataTable({
+      table_data <- m1_data()$table_data
+      pct_cols <- grep("^pctExpress_", names(table_data), value = TRUE)
+      dt <- datatable(
+        table_data,
+        rownames = FALSE,
+        class = "stripe hover nowrap",
+        extensions = "Buttons",
+        options = list(
+          pageLength = 50,
+          lengthMenu = c(25, 50, 100),
+          deferRender = TRUE,
+          dom = "Bfrtip",
+          buttons = c("copy", "csv", "excel"),
+          scrollX = TRUE,
+          scrollCollapse = TRUE,
+          autoWidth = FALSE,
+          initComplete = JS(
+            "function(settings, json) {",
+            "  var api = this.api();",
+            "  $(api.table().container()).css('width', '100%');",
+            "  api.columns.adjust();",
+            "  setTimeout(function(){ api.columns.adjust(); }, 80);",
+            "  setTimeout(function(){ api.columns.adjust(); }, 260);",
+            "}"
+          )
+        ),
+        callback = JS(
+          "var adjustM1 = function(){ table.columns.adjust(); };",
+          "setTimeout(adjustM1, 0);",
+          "setTimeout(adjustM1, 120);",
+          "setTimeout(adjustM1, 320);",
+          "$(document).off('shown.bs.tab.m1dt').on('shown.bs.tab.m1dt', function(){ setTimeout(adjustM1, 50); });",
+          "var rowgroup = $(table.table().container()).closest('.ra-rowgroup');",
+          "rowgroup.find('.ra-advanced-toggle').off('click.m1dt').on('click.m1dt', function(){",
+          "  setTimeout(adjustM1, 40);",
+          "  setTimeout(adjustM1, 220);",
+          "});",
+          "table.on('draw.dt', function(){ table.columns.adjust(); });",
+          "$(window).on('resize', function(){ table.columns.adjust(); });"
+        )
+      )
+      if (length(pct_cols)) {
+        dt <- dt %>% formatRound(columns = pct_cols, digits = 2)
+      }
+      dt
+    }, server = FALSE)
+
+    # ---- Tab a1: CellInfo vs GeneExpr ----
+    output[[make_id("a1oup1")]] <- renderPlot({
+      apply_legend_visibility(
+        with_dark(
+          scDRcell,
+          get_conf(),
+          get_meta(),
+          input[[make_id("a1drX")]],
+          input[[make_id("a1drY")]],
+          input[[make_id("a1inp1")]],
+          input[[make_id("a1sub1")]],
+          input[[make_id("a1sub2")]],
+          input[[make_id("a1siz")]],
+          input[[make_id("a1col1")]],
+          input[[make_id("a1ord1")]],
+          input[[make_id("a1fsz")]],
+          input[[make_id("a1asp")]],
+          input[[make_id("a1txt")]],
+          input[[make_id("a1lab1")]],
+          stage_split = input[[make_id("a1split")]]
+        ),
+        "a1"
       )
     })
     output[[make_id("a1oup1.ui")]] <- renderUI({
@@ -3337,23 +4043,26 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("a1oup1.h")]],
           width = input[[make_id("a1oup1.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRcell,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a1drX")]],
-            input[[make_id("a1drY")]],
-            input[[make_id("a1inp1")]],
-            input[[make_id("a1sub1")]],
-            input[[make_id("a1sub2")]],
-            input[[make_id("a1siz")]],
-            input[[make_id("a1col1")]],
-            input[[make_id("a1ord1")]],
-            input[[make_id("a1fsz")]],
-            input[[make_id("a1asp")]],
-            input[[make_id("a1txt")]],
-            input[[make_id("a1lab1")]],
-            stage_split = input[[make_id("a1split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcell,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a1drX")]],
+              input[[make_id("a1drY")]],
+              input[[make_id("a1inp1")]],
+              input[[make_id("a1sub1")]],
+              input[[make_id("a1sub2")]],
+              input[[make_id("a1siz")]],
+              input[[make_id("a1col1")]],
+              input[[make_id("a1ord1")]],
+              input[[make_id("a1fsz")]],
+              input[[make_id("a1asp")]],
+              input[[make_id("a1txt")]],
+              input[[make_id("a1lab1")]],
+              stage_split = input[[make_id("a1split")]]
+            ),
+            "a1"
           )
         )
       }
@@ -3370,23 +4079,26 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("a1oup1.h")]],
           width = input[[make_id("a1oup1.w")]],
-          plot = with_dark_static(
-            scDRcell,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a1drX")]],
-            input[[make_id("a1drY")]],
-            input[[make_id("a1inp1")]],
-            input[[make_id("a1sub1")]],
-            input[[make_id("a1sub2")]],
-            input[[make_id("a1siz")]],
-            input[[make_id("a1col1")]],
-            input[[make_id("a1ord1")]],
-            input[[make_id("a1fsz")]],
-            input[[make_id("a1asp")]],
-            input[[make_id("a1txt")]],
-            input[[make_id("a1lab1")]],
-            stage_split = input[[make_id("a1split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcell,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a1drX")]],
+              input[[make_id("a1drY")]],
+              input[[make_id("a1inp1")]],
+              input[[make_id("a1sub1")]],
+              input[[make_id("a1sub2")]],
+              input[[make_id("a1siz")]],
+              input[[make_id("a1col1")]],
+              input[[make_id("a1ord1")]],
+              input[[make_id("a1fsz")]],
+              input[[make_id("a1asp")]],
+              input[[make_id("a1txt")]],
+              input[[make_id("a1lab1")]],
+              stage_split = input[[make_id("a1split")]]
+            ),
+            "a1"
           )
         )
       }
@@ -3420,24 +4132,27 @@ shinyServer(function(input, output, session) {
 
     output[[make_id("a1oup2")]] <- renderPlot({
       sc_profile_eval(prefix, "gene_umap_primary", {
-        with_dark(
-          scDRgene,
-          get_conf(),
-          get_meta(),
-          input[[make_id("a1drX")]],
-          input[[make_id("a1drY")]],
-          input[[make_id("a1inp2")]],
-          input[[make_id("a1sub1")]],
-          input[[make_id("a1sub2")]],
-          gexpr_path,
-          get_gene(),
-          input[[make_id("a1siz")]],
-          input[[make_id("a1col2")]],
-          input[[make_id("a1ord2")]],
-          input[[make_id("a1fsz")]],
-          input[[make_id("a1asp")]],
-          input[[make_id("a1txt")]],
-          stage_split = input[[make_id("a1split")]]
+        apply_legend_visibility(
+          with_dark(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a1drX")]],
+            input[[make_id("a1drY")]],
+            input[[make_id("a1inp2")]],
+            input[[make_id("a1sub1")]],
+            input[[make_id("a1sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a1siz")]],
+            input[[make_id("a1col2")]],
+            input[[make_id("a1ord2")]],
+            input[[make_id("a1fsz")]],
+            input[[make_id("a1asp")]],
+            input[[make_id("a1txt")]],
+            stage_split = input[[make_id("a1split")]]
+          ),
+          "a1"
         )
       })
     })
@@ -3458,24 +4173,27 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("a1oup2.h")]],
           width = input[[make_id("a1oup2.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRgene,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a1drX")]],
-            input[[make_id("a1drY")]],
-            input[[make_id("a1inp2")]],
-            input[[make_id("a1sub1")]],
-            input[[make_id("a1sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("a1siz")]],
-            input[[make_id("a1col2")]],
-            input[[make_id("a1ord2")]],
-            input[[make_id("a1fsz")]],
-            input[[make_id("a1asp")]],
-            input[[make_id("a1txt")]],
-            stage_split = input[[make_id("a1split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRgene,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a1drX")]],
+              input[[make_id("a1drY")]],
+              input[[make_id("a1inp2")]],
+              input[[make_id("a1sub1")]],
+              input[[make_id("a1sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("a1siz")]],
+              input[[make_id("a1col2")]],
+              input[[make_id("a1ord2")]],
+              input[[make_id("a1fsz")]],
+              input[[make_id("a1asp")]],
+              input[[make_id("a1txt")]],
+              stage_split = input[[make_id("a1split")]]
+            ),
+            "a1"
           )
         )
       }
@@ -3492,24 +4210,27 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("a1oup2.h")]],
           width = input[[make_id("a1oup2.w")]],
-          plot = with_dark_static(
-            scDRgene,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a1drX")]],
-            input[[make_id("a1drY")]],
-            input[[make_id("a1inp2")]],
-            input[[make_id("a1sub1")]],
-            input[[make_id("a1sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("a1siz")]],
-            input[[make_id("a1col2")]],
-            input[[make_id("a1ord2")]],
-            input[[make_id("a1fsz")]],
-            input[[make_id("a1asp")]],
-            input[[make_id("a1txt")]],
-            stage_split = input[[make_id("a1split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRgene,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a1drX")]],
+              input[[make_id("a1drY")]],
+              input[[make_id("a1inp2")]],
+              input[[make_id("a1sub1")]],
+              input[[make_id("a1sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("a1siz")]],
+              input[[make_id("a1col2")]],
+              input[[make_id("a1ord2")]],
+              input[[make_id("a1fsz")]],
+              input[[make_id("a1asp")]],
+              input[[make_id("a1txt")]],
+              stage_split = input[[make_id("a1split")]]
+            ),
+            "a1"
           )
         )
       }
@@ -3517,23 +4238,26 @@ shinyServer(function(input, output, session) {
 
     # ---- Tab a2: CellInfo vs CellInfo ----
     output[[make_id("a2oup1")]] <- renderPlot({
-      with_dark(
-        scDRcell,
-        get_conf(),
-        get_meta(),
-        input[[make_id("a2drX")]],
-        input[[make_id("a2drY")]],
-        input[[make_id("a2inp1")]],
-        input[[make_id("a2sub1")]],
-        input[[make_id("a2sub2")]],
-        input[[make_id("a2siz")]],
-        input[[make_id("a2col1")]],
-        input[[make_id("a2ord1")]],
-        input[[make_id("a2fsz")]],
-        input[[make_id("a2asp")]],
-        input[[make_id("a2txt")]],
-        input[[make_id("a2lab1")]],
-        stage_split = input[[make_id("a2split")]]
+      apply_legend_visibility(
+        with_dark(
+          scDRcell,
+          get_conf(),
+          get_meta(),
+          input[[make_id("a2drX")]],
+          input[[make_id("a2drY")]],
+          input[[make_id("a2inp1")]],
+          input[[make_id("a2sub1")]],
+          input[[make_id("a2sub2")]],
+          input[[make_id("a2siz")]],
+          input[[make_id("a2col1")]],
+          input[[make_id("a2ord1")]],
+          input[[make_id("a2fsz")]],
+          input[[make_id("a2asp")]],
+          input[[make_id("a2txt")]],
+          input[[make_id("a2lab1")]],
+          stage_split = input[[make_id("a2split")]]
+        ),
+        "a2"
       )
     })
     output[[make_id("a2oup1.ui")]] <- renderUI({
@@ -3553,23 +4277,26 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("a2oup1.h")]],
           width = input[[make_id("a2oup1.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRcell,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a2drX")]],
-            input[[make_id("a2drY")]],
-            input[[make_id("a2inp1")]],
-            input[[make_id("a2sub1")]],
-            input[[make_id("a2sub2")]],
-            input[[make_id("a2siz")]],
-            input[[make_id("a2col1")]],
-            input[[make_id("a2ord1")]],
-            input[[make_id("a2fsz")]],
-            input[[make_id("a2asp")]],
-            input[[make_id("a2txt")]],
-            input[[make_id("a2lab1")]],
-            stage_split = input[[make_id("a2split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcell,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a2drX")]],
+              input[[make_id("a2drY")]],
+              input[[make_id("a2inp1")]],
+              input[[make_id("a2sub1")]],
+              input[[make_id("a2sub2")]],
+              input[[make_id("a2siz")]],
+              input[[make_id("a2col1")]],
+              input[[make_id("a2ord1")]],
+              input[[make_id("a2fsz")]],
+              input[[make_id("a2asp")]],
+              input[[make_id("a2txt")]],
+              input[[make_id("a2lab1")]],
+              stage_split = input[[make_id("a2split")]]
+            ),
+            "a2"
           )
         )
       }
@@ -3586,46 +4313,52 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("a2oup1.h")]],
           width = input[[make_id("a2oup1.w")]],
-          plot = with_dark_static(
-            scDRcell,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a2drX")]],
-            input[[make_id("a2drY")]],
-            input[[make_id("a2inp1")]],
-            input[[make_id("a2sub1")]],
-            input[[make_id("a2sub2")]],
-            input[[make_id("a2siz")]],
-            input[[make_id("a2col1")]],
-            input[[make_id("a2ord1")]],
-            input[[make_id("a2fsz")]],
-            input[[make_id("a2asp")]],
-            input[[make_id("a2txt")]],
-            input[[make_id("a2lab1")]],
-            stage_split = input[[make_id("a2split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcell,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a2drX")]],
+              input[[make_id("a2drY")]],
+              input[[make_id("a2inp1")]],
+              input[[make_id("a2sub1")]],
+              input[[make_id("a2sub2")]],
+              input[[make_id("a2siz")]],
+              input[[make_id("a2col1")]],
+              input[[make_id("a2ord1")]],
+              input[[make_id("a2fsz")]],
+              input[[make_id("a2asp")]],
+              input[[make_id("a2txt")]],
+              input[[make_id("a2lab1")]],
+              stage_split = input[[make_id("a2split")]]
+            ),
+            "a2"
           )
         )
       }
     )
 
     output[[make_id("a2oup2")]] <- renderPlot({
-      with_dark(
-        scDRcell,
-        get_conf(),
-        get_meta(),
-        input[[make_id("a2drX")]],
-        input[[make_id("a2drY")]],
-        input[[make_id("a2inp2")]],
-        input[[make_id("a2sub1")]],
-        input[[make_id("a2sub2")]],
-        input[[make_id("a2siz")]],
-        input[[make_id("a2col2")]],
-        input[[make_id("a2ord2")]],
-        input[[make_id("a2fsz")]],
-        input[[make_id("a2asp")]],
-        input[[make_id("a2txt")]],
-        input[[make_id("a2lab2")]],
-        stage_split = input[[make_id("a2split")]]
+      apply_legend_visibility(
+        with_dark(
+          scDRcell,
+          get_conf(),
+          get_meta(),
+          input[[make_id("a2drX")]],
+          input[[make_id("a2drY")]],
+          input[[make_id("a2inp2")]],
+          input[[make_id("a2sub1")]],
+          input[[make_id("a2sub2")]],
+          input[[make_id("a2siz")]],
+          input[[make_id("a2col2")]],
+          input[[make_id("a2ord2")]],
+          input[[make_id("a2fsz")]],
+          input[[make_id("a2asp")]],
+          input[[make_id("a2txt")]],
+          input[[make_id("a2lab2")]],
+          stage_split = input[[make_id("a2split")]]
+        ),
+        "a2"
       )
     })
     output[[make_id("a2oup2.ui")]] <- renderUI({
@@ -3645,23 +4378,26 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("a2oup2.h")]],
           width = input[[make_id("a2oup2.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRcell,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a2drX")]],
-            input[[make_id("a2drY")]],
-            input[[make_id("a2inp2")]],
-            input[[make_id("a2sub1")]],
-            input[[make_id("a2sub2")]],
-            input[[make_id("a2siz")]],
-            input[[make_id("a2col2")]],
-            input[[make_id("a2ord2")]],
-            input[[make_id("a2fsz")]],
-            input[[make_id("a2asp")]],
-            input[[make_id("a2txt")]],
-            input[[make_id("a2lab2")]],
-            stage_split = input[[make_id("a2split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcell,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a2drX")]],
+              input[[make_id("a2drY")]],
+              input[[make_id("a2inp2")]],
+              input[[make_id("a2sub1")]],
+              input[[make_id("a2sub2")]],
+              input[[make_id("a2siz")]],
+              input[[make_id("a2col2")]],
+              input[[make_id("a2ord2")]],
+              input[[make_id("a2fsz")]],
+              input[[make_id("a2asp")]],
+              input[[make_id("a2txt")]],
+              input[[make_id("a2lab2")]],
+              stage_split = input[[make_id("a2split")]]
+            ),
+            "a2"
           )
         )
       }
@@ -3678,23 +4414,26 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("a2oup2.h")]],
           width = input[[make_id("a2oup2.w")]],
-          plot = with_dark_static(
-            scDRcell,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a2drX")]],
-            input[[make_id("a2drY")]],
-            input[[make_id("a2inp2")]],
-            input[[make_id("a2sub1")]],
-            input[[make_id("a2sub2")]],
-            input[[make_id("a2siz")]],
-            input[[make_id("a2col2")]],
-            input[[make_id("a2ord2")]],
-            input[[make_id("a2fsz")]],
-            input[[make_id("a2asp")]],
-            input[[make_id("a2txt")]],
-            input[[make_id("a2lab2")]],
-            stage_split = input[[make_id("a2split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcell,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a2drX")]],
+              input[[make_id("a2drY")]],
+              input[[make_id("a2inp2")]],
+              input[[make_id("a2sub1")]],
+              input[[make_id("a2sub2")]],
+              input[[make_id("a2siz")]],
+              input[[make_id("a2col2")]],
+              input[[make_id("a2ord2")]],
+              input[[make_id("a2fsz")]],
+              input[[make_id("a2asp")]],
+              input[[make_id("a2txt")]],
+              input[[make_id("a2lab2")]],
+              stage_split = input[[make_id("a2split")]]
+            ),
+            "a2"
           )
         )
       }
@@ -3703,24 +4442,27 @@ shinyServer(function(input, output, session) {
     # ---- Tab a3: GeneExpr vs GeneExpr ----
     output[[make_id("a3oup1")]] <- renderPlot({
       sc_profile_eval(prefix, "gene_umap_compare_left", {
-        with_dark(
-          scDRgene,
-          get_conf(),
-          get_meta(),
-          input[[make_id("a3drX")]],
-          input[[make_id("a3drY")]],
-          input[[make_id("a3inp1")]],
-          input[[make_id("a3sub1")]],
-          input[[make_id("a3sub2")]],
-          gexpr_path,
-          get_gene(),
-          input[[make_id("a3siz")]],
-          input[[make_id("a3col1")]],
-          input[[make_id("a3ord1")]],
-          input[[make_id("a3fsz")]],
-          input[[make_id("a3asp")]],
-          input[[make_id("a3txt")]],
-          stage_split = input[[make_id("a3split")]]
+        apply_legend_visibility(
+          with_dark(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a3drX")]],
+            input[[make_id("a3drY")]],
+            input[[make_id("a3inp1")]],
+            input[[make_id("a3sub1")]],
+            input[[make_id("a3sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a3siz")]],
+            input[[make_id("a3col1")]],
+            input[[make_id("a3ord1")]],
+            input[[make_id("a3fsz")]],
+            input[[make_id("a3asp")]],
+            input[[make_id("a3txt")]],
+            stage_split = input[[make_id("a3split")]]
+          ),
+          "a3"
         )
       })
     })
@@ -3741,24 +4483,27 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("a3oup1.h")]],
           width = input[[make_id("a3oup1.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRgene,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a3drX")]],
-            input[[make_id("a3drY")]],
-            input[[make_id("a3inp1")]],
-            input[[make_id("a3sub1")]],
-            input[[make_id("a3sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("a3siz")]],
-            input[[make_id("a3col1")]],
-            input[[make_id("a3ord1")]],
-            input[[make_id("a3fsz")]],
-            input[[make_id("a3asp")]],
-            input[[make_id("a3txt")]],
-            stage_split = input[[make_id("a3split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRgene,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a3drX")]],
+              input[[make_id("a3drY")]],
+              input[[make_id("a3inp1")]],
+              input[[make_id("a3sub1")]],
+              input[[make_id("a3sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("a3siz")]],
+              input[[make_id("a3col1")]],
+              input[[make_id("a3ord1")]],
+              input[[make_id("a3fsz")]],
+              input[[make_id("a3asp")]],
+              input[[make_id("a3txt")]],
+              stage_split = input[[make_id("a3split")]]
+            ),
+            "a3"
           )
         )
       }
@@ -3775,24 +4520,27 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("a3oup1.h")]],
           width = input[[make_id("a3oup1.w")]],
-          plot = with_dark_static(
-            scDRgene,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a3drX")]],
-            input[[make_id("a3drY")]],
-            input[[make_id("a3inp1")]],
-            input[[make_id("a3sub1")]],
-            input[[make_id("a3sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("a3siz")]],
-            input[[make_id("a3col1")]],
-            input[[make_id("a3ord1")]],
-            input[[make_id("a3fsz")]],
-            input[[make_id("a3asp")]],
-            input[[make_id("a3txt")]],
-            stage_split = input[[make_id("a3split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRgene,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a3drX")]],
+              input[[make_id("a3drY")]],
+              input[[make_id("a3inp1")]],
+              input[[make_id("a3sub1")]],
+              input[[make_id("a3sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("a3siz")]],
+              input[[make_id("a3col1")]],
+              input[[make_id("a3ord1")]],
+              input[[make_id("a3fsz")]],
+              input[[make_id("a3asp")]],
+              input[[make_id("a3txt")]],
+              stage_split = input[[make_id("a3split")]]
+            ),
+            "a3"
           )
         )
       }
@@ -3800,24 +4548,27 @@ shinyServer(function(input, output, session) {
 
     output[[make_id("a3oup2")]] <- renderPlot({
       sc_profile_eval(prefix, "gene_umap_compare_right", {
-        with_dark(
-          scDRgene,
-          get_conf(),
-          get_meta(),
-          input[[make_id("a3drX")]],
-          input[[make_id("a3drY")]],
-          input[[make_id("a3inp2")]],
-          input[[make_id("a3sub1")]],
-          input[[make_id("a3sub2")]],
-          gexpr_path,
-          get_gene(),
-          input[[make_id("a3siz")]],
-          input[[make_id("a3col2")]],
-          input[[make_id("a3ord2")]],
-          input[[make_id("a3fsz")]],
-          input[[make_id("a3asp")]],
-          input[[make_id("a3txt")]],
-          stage_split = input[[make_id("a3split")]]
+        apply_legend_visibility(
+          with_dark(
+            scDRgene,
+            get_conf(),
+            get_meta(),
+            input[[make_id("a3drX")]],
+            input[[make_id("a3drY")]],
+            input[[make_id("a3inp2")]],
+            input[[make_id("a3sub1")]],
+            input[[make_id("a3sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("a3siz")]],
+            input[[make_id("a3col2")]],
+            input[[make_id("a3ord2")]],
+            input[[make_id("a3fsz")]],
+            input[[make_id("a3asp")]],
+            input[[make_id("a3txt")]],
+            stage_split = input[[make_id("a3split")]]
+          ),
+          "a3"
         )
       })
     })
@@ -3838,24 +4589,27 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("a3oup2.h")]],
           width = input[[make_id("a3oup2.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRgene,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a3drX")]],
-            input[[make_id("a3drY")]],
-            input[[make_id("a3inp2")]],
-            input[[make_id("a3sub1")]],
-            input[[make_id("a3sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("a3siz")]],
-            input[[make_id("a3col2")]],
-            input[[make_id("a3ord2")]],
-            input[[make_id("a3fsz")]],
-            input[[make_id("a3asp")]],
-            input[[make_id("a3txt")]],
-            stage_split = input[[make_id("a3split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRgene,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a3drX")]],
+              input[[make_id("a3drY")]],
+              input[[make_id("a3inp2")]],
+              input[[make_id("a3sub1")]],
+              input[[make_id("a3sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("a3siz")]],
+              input[[make_id("a3col2")]],
+              input[[make_id("a3ord2")]],
+              input[[make_id("a3fsz")]],
+              input[[make_id("a3asp")]],
+              input[[make_id("a3txt")]],
+              stage_split = input[[make_id("a3split")]]
+            ),
+            "a3"
           )
         )
       }
@@ -3872,24 +4626,27 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("a3oup2.h")]],
           width = input[[make_id("a3oup2.w")]],
-          plot = with_dark_static(
-            scDRgene,
-            get_conf(),
-            get_meta(),
-            input[[make_id("a3drX")]],
-            input[[make_id("a3drY")]],
-            input[[make_id("a3inp2")]],
-            input[[make_id("a3sub1")]],
-            input[[make_id("a3sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("a3siz")]],
-            input[[make_id("a3col2")]],
-            input[[make_id("a3ord2")]],
-            input[[make_id("a3fsz")]],
-            input[[make_id("a3asp")]],
-            input[[make_id("a3txt")]],
-            stage_split = input[[make_id("a3split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRgene,
+              get_conf(),
+              get_meta(),
+              input[[make_id("a3drX")]],
+              input[[make_id("a3drY")]],
+              input[[make_id("a3inp2")]],
+              input[[make_id("a3sub1")]],
+              input[[make_id("a3sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("a3siz")]],
+              input[[make_id("a3col2")]],
+              input[[make_id("a3ord2")]],
+              input[[make_id("a3fsz")]],
+              input[[make_id("a3asp")]],
+              input[[make_id("a3txt")]],
+              stage_split = input[[make_id("a3split")]]
+            ),
+            "a3"
           )
         )
       }
@@ -3898,25 +4655,28 @@ shinyServer(function(input, output, session) {
     # ---- Tab b2: Gene coexpression ----
     output[[make_id("b2oup1")]] <- renderPlot({
       sc_profile_eval(prefix, "coexpression_umap", {
-        with_dark(
-          scDRcoex,
-          get_conf(),
-          get_meta(),
-          input[[make_id("b2drX")]],
-          input[[make_id("b2drY")]],
-          input[[make_id("b2inp1")]],
-          input[[make_id("b2inp2")]],
-          input[[make_id("b2sub1")]],
-          input[[make_id("b2sub2")]],
-          gexpr_path,
-          get_gene(),
-          input[[make_id("b2siz")]],
-          input[[make_id("b2col1")]],
-          input[[make_id("b2ord1")]],
-          input[[make_id("b2fsz")]],
-          input[[make_id("b2asp")]],
-          input[[make_id("b2txt")]],
-          stage_split = input[[make_id("b2split")]]
+        apply_legend_visibility(
+          with_dark(
+            scDRcoex,
+            get_conf(),
+            get_meta(),
+            input[[make_id("b2drX")]],
+            input[[make_id("b2drY")]],
+            input[[make_id("b2inp1")]],
+            input[[make_id("b2inp2")]],
+            input[[make_id("b2sub1")]],
+            input[[make_id("b2sub2")]],
+            gexpr_path,
+            get_gene(),
+            input[[make_id("b2siz")]],
+            input[[make_id("b2col1")]],
+            input[[make_id("b2ord1")]],
+            input[[make_id("b2fsz")]],
+            input[[make_id("b2asp")]],
+            input[[make_id("b2txt")]],
+            stage_split = input[[make_id("b2split")]]
+          ),
+          "b2"
         )
       })
     })
@@ -3937,25 +4697,28 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("b2oup1.h")]],
           width = input[[make_id("b2oup1.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scDRcoex,
-            get_conf(),
-            get_meta(),
-            input[[make_id("b2drX")]],
-            input[[make_id("b2drY")]],
-            input[[make_id("b2inp1")]],
-            input[[make_id("b2inp2")]],
-            input[[make_id("b2sub1")]],
-            input[[make_id("b2sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("b2siz")]],
-            input[[make_id("b2col1")]],
-            input[[make_id("b2ord1")]],
-            input[[make_id("b2fsz")]],
-            input[[make_id("b2asp")]],
-            input[[make_id("b2txt")]],
-            stage_split = input[[make_id("b2split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcoex,
+              get_conf(),
+              get_meta(),
+              input[[make_id("b2drX")]],
+              input[[make_id("b2drY")]],
+              input[[make_id("b2inp1")]],
+              input[[make_id("b2inp2")]],
+              input[[make_id("b2sub1")]],
+              input[[make_id("b2sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("b2siz")]],
+              input[[make_id("b2col1")]],
+              input[[make_id("b2ord1")]],
+              input[[make_id("b2fsz")]],
+              input[[make_id("b2asp")]],
+              input[[make_id("b2txt")]],
+              stage_split = input[[make_id("b2split")]]
+            ),
+            "b2"
           )
         )
       }
@@ -3972,25 +4735,28 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("b2oup1.h")]],
           width = input[[make_id("b2oup1.w")]],
-          plot = with_dark_static(
-            scDRcoex,
-            get_conf(),
-            get_meta(),
-            input[[make_id("b2drX")]],
-            input[[make_id("b2drY")]],
-            input[[make_id("b2inp1")]],
-            input[[make_id("b2inp2")]],
-            input[[make_id("b2sub1")]],
-            input[[make_id("b2sub2")]],
-            gexpr_path,
-            get_gene(),
-            input[[make_id("b2siz")]],
-            input[[make_id("b2col1")]],
-            input[[make_id("b2ord1")]],
-            input[[make_id("b2fsz")]],
-            input[[make_id("b2asp")]],
-            input[[make_id("b2txt")]],
-            stage_split = input[[make_id("b2split")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scDRcoex,
+              get_conf(),
+              get_meta(),
+              input[[make_id("b2drX")]],
+              input[[make_id("b2drY")]],
+              input[[make_id("b2inp1")]],
+              input[[make_id("b2inp2")]],
+              input[[make_id("b2sub1")]],
+              input[[make_id("b2sub2")]],
+              gexpr_path,
+              get_gene(),
+              input[[make_id("b2siz")]],
+              input[[make_id("b2col1")]],
+              input[[make_id("b2ord1")]],
+              input[[make_id("b2fsz")]],
+              input[[make_id("b2asp")]],
+              input[[make_id("b2txt")]],
+              stage_split = input[[make_id("b2split")]]
+            ),
+            "b2"
           )
         )
       }
@@ -4085,7 +4851,8 @@ shinyServer(function(input, output, session) {
           input[[make_id("c1typ")]],
           input[[make_id("c1pts")]],
           input[[make_id("c1siz")]],
-          input[[make_id("c1fsz")]]
+          input[[make_id("c1fsz")]],
+          show_legend = legend_enabled("c1")
         )
       })
     })
@@ -4120,7 +4887,8 @@ shinyServer(function(input, output, session) {
             input[[make_id("c1typ")]],
             input[[make_id("c1pts")]],
             input[[make_id("c1siz")]],
-            input[[make_id("c1fsz")]]
+            input[[make_id("c1fsz")]],
+            show_legend = legend_enabled("c1")
           )
         )
       }
@@ -4151,7 +4919,8 @@ shinyServer(function(input, output, session) {
             input[[make_id("c1typ")]],
             input[[make_id("c1pts")]],
             input[[make_id("c1siz")]],
-            input[[make_id("c1fsz")]]
+            input[[make_id("c1fsz")]],
+            show_legend = legend_enabled("c1")
           )
         )
       }
@@ -4159,17 +4928,20 @@ shinyServer(function(input, output, session) {
 
     # ---- Tab c2: Proportion plot ----
     output[[make_id("c2oup")]] <- renderPlot({
-      with_dark(
-        scProp,
-        get_conf(),
-        get_meta(),
-        input[[make_id("c2inp1")]],
-        input[[make_id("c2inp2")]],
-        input[[make_id("c2sub1")]],
-        input[[make_id("c2sub2")]],
-        input[[make_id("c2typ")]],
-        input[[make_id("c2flp")]],
-        input[[make_id("c2fsz")]]
+      apply_legend_visibility(
+        with_dark(
+          scProp,
+          get_conf(),
+          get_meta(),
+          input[[make_id("c2inp1")]],
+          input[[make_id("c2inp2")]],
+          input[[make_id("c2sub1")]],
+          input[[make_id("c2sub2")]],
+          input[[make_id("c2typ")]],
+          input[[make_id("c2flp")]],
+          input[[make_id("c2fsz")]]
+        ),
+        "c2"
       )
     })
     output[[make_id("c2oup.ui")]] <- renderUI({
@@ -4189,17 +4961,20 @@ shinyServer(function(input, output, session) {
           height = input[[make_id("c2oup.h")]],
           width = input[[make_id("c2oup.w")]],
           useDingbats = FALSE,
-          plot = with_dark_static(
-            scProp,
-            get_conf(),
-            get_meta(),
-            input[[make_id("c2inp1")]],
-            input[[make_id("c2inp2")]],
-            input[[make_id("c2sub1")]],
-            input[[make_id("c2sub2")]],
-            input[[make_id("c2typ")]],
-            input[[make_id("c2flp")]],
-            input[[make_id("c2fsz")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scProp,
+              get_conf(),
+              get_meta(),
+              input[[make_id("c2inp1")]],
+              input[[make_id("c2inp2")]],
+              input[[make_id("c2sub1")]],
+              input[[make_id("c2sub2")]],
+              input[[make_id("c2typ")]],
+              input[[make_id("c2flp")]],
+              input[[make_id("c2fsz")]]
+            ),
+            "c2"
           )
         )
       }
@@ -4216,17 +4991,20 @@ shinyServer(function(input, output, session) {
           device = "png",
           height = input[[make_id("c2oup.h")]],
           width = input[[make_id("c2oup.w")]],
-          plot = with_dark_static(
-            scProp,
-            get_conf(),
-            get_meta(),
-            input[[make_id("c2inp1")]],
-            input[[make_id("c2inp2")]],
-            input[[make_id("c2sub1")]],
-            input[[make_id("c2sub2")]],
-            input[[make_id("c2typ")]],
-            input[[make_id("c2flp")]],
-            input[[make_id("c2fsz")]]
+          plot = apply_legend_visibility(
+            with_dark_static(
+              scProp,
+              get_conf(),
+              get_meta(),
+              input[[make_id("c2inp1")]],
+              input[[make_id("c2inp2")]],
+              input[[make_id("c2sub1")]],
+              input[[make_id("c2sub2")]],
+              input[[make_id("c2typ")]],
+              input[[make_id("c2flp")]],
+              input[[make_id("c2fsz")]]
+            ),
+            "c2"
           )
         )
       }
@@ -4270,7 +5048,8 @@ shinyServer(function(input, output, session) {
           input[[make_id("d1row")]],
           input[[make_id("d1col")]],
           input[[make_id("d1cols")]],
-          input[[make_id("d1fsz")]]
+          input[[make_id("d1fsz")]],
+          show_legend = legend_enabled("d1")
         )
       })
     })
@@ -4306,7 +5085,8 @@ shinyServer(function(input, output, session) {
             input[[make_id("d1col")]],
             input[[make_id("d1cols")]],
             input[[make_id("d1fsz")]],
-            save = TRUE
+            save = TRUE,
+            show_legend = legend_enabled("d1")
           )
         )
       }
@@ -4339,7 +5119,8 @@ shinyServer(function(input, output, session) {
             input[[make_id("d1col")]],
             input[[make_id("d1cols")]],
             input[[make_id("d1fsz")]],
-            save = TRUE
+            save = TRUE,
+            show_legend = legend_enabled("d1")
           )
         )
       }
@@ -4347,6 +5128,7 @@ shinyServer(function(input, output, session) {
 
     suspend_ids <- c(
       "a1sub1.ui", "a1oup1", "a1oup1.ui", "a1.dt", "a1oup2", "a1oup2.ui",
+      "m1sub1.ui", "m1oupTxt", "m1oup", "m1oup.ui", "m1.dt",
       "a2sub1.ui", "a2oup1", "a2oup1.ui", "a2oup2", "a2oup2.ui",
       "a3sub1.ui", "a3oup1", "a3oup1.ui", "a3oup2", "a3oup2.ui",
       "b2sub1.ui", "b2oup1", "b2oup1.ui", "b2oup2", "b2.dt",
@@ -4362,8 +5144,7 @@ shinyServer(function(input, output, session) {
   dataset_tab_definitions <- list(
     list(title = "Main Figures", suffix = "main_figures", builder = build_main_figures_tab),
     list(title = "CellInfo vs GeneExpr", suffix = "cellinfo_gene", builder = build_cellinfo_gene_tab),
-    list(title = "CellInfo vs CellInfo", suffix = "cellinfo_cellinfo", builder = build_cellinfo_cellinfo_tab),
-    list(title = "GeneExpr vs GeneExpr", suffix = "gene_gene", builder = build_gene_gene_tab),
+    list(title = "Multiple GeneExpr", suffix = "multiple_geneexpr", builder = build_multiple_geneexpr_tab),
     list(title = "Gene coexpression", suffix = "gene_coexpression", builder = build_gene_coexpression_tab),
     list(title = "Violinplot / Boxplot", suffix = "violin_boxplot", builder = build_violin_boxplot_tab),
     list(title = "Proportion plot", suffix = "proportion_plot", builder = build_proportion_plot_tab),
@@ -4373,7 +5154,7 @@ shinyServer(function(input, output, session) {
   dataset_specs <- list(
     sc3 = list(
       prefix = "sc3",
-      dataset_name = "Staged Testis",
+      dataset_name = "Full Atlas",
       get_conf = function() sc3conf,
       get_meta = function() sc3meta,
       get_def = function() sc3def,
@@ -4564,8 +5345,16 @@ shinyServer(function(input, output, session) {
     view_w <- 900
     view_h <- 486
     
-    bg_img <- tags$image(
+    bg_img_light <- tags$image(
       href = "interactiveTable.png",  # file must be in www/
+      class = "spg-table-bg spg-table-bg-light",
+      x = 0, y = 0, width = view_w, height = view_h,
+      preserveAspectRatio = "none"
+    )
+
+    bg_img_dark <- tags$image(
+      href = "interactiveTable_dark.png",
+      class = "spg-table-bg spg-table-bg-dark",
       x = 0, y = 0, width = view_w, height = view_h,
       preserveAspectRatio = "none"
     )
@@ -4584,7 +5373,8 @@ shinyServer(function(input, output, session) {
       id = "sperma-svg",
       viewBox = sprintf("0 0 %d %d", view_w, view_h),
       preserveAspectRatio = "xMidYMid meet",
-      bg_img,
+      bg_img_light,
+      bg_img_dark,
       rects
     )
   })
@@ -4598,6 +5388,8 @@ shinyServer(function(input, output, session) {
       session$sendCustomMessage("unhighlightButton", last_btn)
       active_button(NULL)   # clear stored id so nothing stays highlighted
     }
+    spg_modal_open(FALSE)
+    session$sendCustomMessage("spgModalLock", FALSE)
   }, ignoreInit = TRUE)
   
 
@@ -4724,6 +5516,7 @@ shinyServer(function(input, output, session) {
 
   spg_modal_table_full <- reactiveVal(empty_spg_gene_table())
   spg_modal_state <- reactiveVal(list(btn_id = NULL, sample = NULL, cell_type = NULL))
+  spg_modal_open <- reactiveVal(FALSE)
   spg_search_state <- reactiveVal(list(
     gene_name = NULL,
     min_expr = NA_real_,
@@ -4825,7 +5618,7 @@ shinyServer(function(input, output, session) {
     spg_last_searched_gene(gene_name)
 
     if (!identical(query, gene_name)) {
-      updateTextInput(session, "gene_search", value = gene_name)
+      updateSelectizeInput(session, "gene_search", selected = gene_name, server = TRUE)
     }
 
     session$sendCustomMessage("spgBusy", TRUE)
@@ -5109,21 +5902,39 @@ shinyServer(function(input, output, session) {
     btn_id <- input$modalClosedBtn
     session$sendCustomMessage("unhighlightButton", btn_id)  # remove blue ring
     active_button(NULL)                                     # reset reactiveVal
+    spg_modal_open(FALSE)
+    session$sendCustomMessage("spgModalLock", FALSE)
     removeModal()
   }, ignoreInit = TRUE)
   
   
   # ==== Single handler for any cell click ====
   observeEvent(input$btn_click, {
+    if (isTRUE(spg_modal_open())) {
+      session$sendCustomMessage("spgModalLock", TRUE)
+      return(invisible(NULL))
+    }
+
     btn_id <- input$btn_click
     parts <- strsplit(btn_id, "_", fixed = TRUE)[[1]]  # "btn", row, col
     if (length(parts) == 3) {
       row <- suppressWarnings(as.integer(parts[2]))
       col <- suppressWarnings(as.integer(parts[3]))
       if (!is.na(row) && !is.na(col)) {
-        show_button_modal(row, col)  # your existing function (unchanged)
+        spg_modal_open(TRUE)
+        session$sendCustomMessage("spgModalLock", TRUE)
+        tryCatch(
+          show_button_modal(row, col),
+          error = function(e) {
+            spg_modal_open(FALSE)
+            session$sendCustomMessage("spgModalLock", FALSE)
+            stop(e)
+          }
+        )
+        return(invisible(NULL))
       }
     }
+    session$sendCustomMessage("spgModalLock", FALSE)
   }, ignoreInit = TRUE, priority = 100)
 
   observeEvent(input$gene_search_btn, {
@@ -5138,6 +5949,14 @@ shinyServer(function(input, output, session) {
     if (nzchar(last_gene %||% "") &&
         nzchar(current_query) &&
         identical(toupper(current_query), toupper(last_gene))) {
+      run_spg_gene_search(query = last_gene, show_notifications = FALSE)
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$theme_mode, {
+    last_gene <- spg_last_searched_gene()
+    if (identical(input$mainTabs, "spermatogonia_table") &&
+        nzchar(last_gene %||% "")) {
       run_spg_gene_search(query = last_gene, show_notifications = FALSE)
     }
   }, ignoreInit = TRUE)
@@ -5438,11 +6257,25 @@ shinyServer(function(input, output, session) {
     if (isTRUE(pub_layout)) {
       rows <- levels(df_rescaled$plot_row)
       plots <- lapply(seq_along(rows), function(i) build_row_plot(rows[[i]], show_x = i == length(rows)))
-      return(patchwork::wrap_plots(plots, ncol = 1, guides = "collect") &
-               theme(legend.position = "right",
-                     legend.background = element_rect(fill = bg_col, colour = NA),
-                     legend.text = element_text(color = axis_col),
-                     legend.title = element_text(color = axis_col)))
+      combined <- patchwork::wrap_plots(plots, ncol = 1, guides = "collect") &
+        theme(
+          plot.background = element_rect(fill = bg_col, colour = NA),
+          panel.background = element_rect(fill = bg_col, colour = NA),
+          legend.position = "right",
+          legend.background = element_rect(fill = bg_col, colour = NA),
+          legend.box.background = element_rect(fill = bg_col, colour = NA),
+          legend.text = element_text(color = axis_col),
+          legend.title = element_text(color = axis_col)
+        )
+      return(
+        combined +
+          patchwork::plot_annotation(
+            theme = theme(
+              plot.background = element_rect(fill = bg_col, colour = NA),
+              panel.background = element_rect(fill = bg_col, colour = NA)
+            )
+          )
+      )
     }
 
     ggplot(df_rescaled, aes(x = sample, y = scaled_expr, color = gene, group = gene,
@@ -5475,10 +6308,13 @@ shinyServer(function(input, output, session) {
       scale_color_manual(values = pal_use, guide = guide_legend(override.aes = list(size = 3)))
   }
   
-  # DotPlot rendering for Figure 5A (replace whole body with this)
-  observeEvent(input$ra_dot_refresh, {
+  # DotPlot rendering for Figure 5A
+  ra_dot_refresh_state <- debounce(reactive({
+    list(input$ra_genes, input$ra_cell_types, is_dark_mode())
+  }), 800)
+  observeEvent(ra_dot_refresh_state(), {
     ra_dot_tick(ra_dot_tick() + 1)
-  })
+  }, ignoreInit = TRUE)
 
   ra_dotplot_event <- eventReactive(ra_dot_tick(), {
     req(ra_plot_gate$ra_dotplot)
@@ -5508,10 +6344,18 @@ shinyServer(function(input, output, session) {
   # Lineplot defaults now set in ensure_line_assets().
   
   
-  # 5C Lineplot rendering (replace whole body with this)
-  observeEvent(input$ra_line_refresh, {
+  # 5C Lineplot rendering
+  ra_line_refresh_state <- debounce(reactive({
+    list(
+      input$ra_line_genes_row1,
+      input$ra_line_genes_row2,
+      input$ra_line_genes_row3,
+      is_dark_mode()
+    )
+  }), 800)
+  observeEvent(ra_line_refresh_state(), {
     ra_line_tick(ra_line_tick() + 1)
-  })
+  }, ignoreInit = TRUE)
 
   ra_lineplot_event <- eventReactive(ra_line_tick(), {
     req(ra_plot_gate$ra_lineplot)
@@ -5592,12 +6436,10 @@ shinyServer(function(input, output, session) {
   })
   
   # Generate heatmap
-  observeEvent(input$ccc_refresh, {
-    ccc_tick(ccc_tick() + 1)
-  })
-  observeEvent(debounce(reactive({
+  ccc_refresh_state <- debounce(reactive({
     list(input$ccc_lr_select, is_dark_mode())
-  }), 2000), {
+  }), 2000)
+  observeEvent(ccc_refresh_state(), {
     ccc_tick(ccc_tick() + 1)
   }, ignoreInit = TRUE)
 
@@ -5703,37 +6545,88 @@ shinyServer(function(input, output, session) {
   
   # Figure 5A — RA DotPlot (vector PDF)
   output$ra_dotplot_pdf <- downloadHandler(
-    filename = function() "Figure_5A.pdf",
+    filename = function() resolve_download_filename(input$ra_dotplot_name, "Figure_5A", ".pdf"),
     content = function(file){
       dark_theme <- isolate(is_dark_mode())
       p <- make_fig5A(pub_theme = TRUE, dark_theme = dark_theme)
-      grDevices::cairo_pdf(file, width = 12.0, height = 7.5, onefile = FALSE)
-      print(p)
-      dev.off()
+      save_ggplot_pdf(
+        file,
+        p,
+        width = download_dimension("ra_dotplot_w", 12),
+        height = download_dimension("ra_dotplot_h", 7.5)
+      )
+    }
+  )
+
+  output$ra_dotplot_png <- downloadHandler(
+    filename = function() resolve_download_filename(input$ra_dotplot_name, "Figure_5A", ".png"),
+    content = function(file){
+      dark_theme <- isolate(is_dark_mode())
+      p <- make_fig5A(pub_theme = TRUE, dark_theme = dark_theme)
+      save_ggplot_png(
+        file,
+        p,
+        width = download_dimension("ra_dotplot_w", 12),
+        height = download_dimension("ra_dotplot_h", 7.5)
+      )
     }
   )
   
   # Figure 5C — RA LinePlot (vector PDF)
   output$ra_lineplot_pdf <- downloadHandler(
-    filename = function() "Figure_5C.pdf",
+    filename = function() resolve_download_filename(input$ra_lineplot_name, "Figure_5C", ".pdf"),
     content = function(file){
       dark_theme <- isolate(is_dark_mode())
       p <- make_fig5C(pub_theme = TRUE, dark_theme = dark_theme)
-      grDevices::cairo_pdf(file, width = 12.0, height = 7.5, onefile = FALSE)
-      print(p)
-      dev.off()
+      save_ggplot_pdf(
+        file,
+        p,
+        width = download_dimension("ra_lineplot_w", 12),
+        height = download_dimension("ra_lineplot_h", 7.5)
+      )
+    }
+  )
+
+  output$ra_lineplot_png <- downloadHandler(
+    filename = function() resolve_download_filename(input$ra_lineplot_name, "Figure_5C", ".png"),
+    content = function(file){
+      dark_theme <- isolate(is_dark_mode())
+      p <- make_fig5C(pub_theme = TRUE, dark_theme = dark_theme)
+      save_ggplot_png(
+        file,
+        p,
+        width = download_dimension("ra_lineplot_w", 12),
+        height = download_dimension("ra_lineplot_h", 7.5)
+      )
     }
   )
   
   # Publication PDF for 6D (vector)
   output$ccc_pdf <- downloadHandler(
-    filename = function() "Figure_6D.pdf",
+    filename = function() resolve_download_filename(input$ccc_name, "Figure_6D", ".pdf"),
     content = function(file){
       dark_theme <- isolate(is_dark_mode())
       p <- make_fig6D_static(input$ccc_lr_select, dark_theme = dark_theme)
-      grDevices::cairo_pdf(file, width = 12.0, height = 9.5, onefile = FALSE)
-      print(p)
-      dev.off()
+      save_ggplot_pdf(
+        file,
+        p,
+        width = download_dimension("ccc_w", 12),
+        height = download_dimension("ccc_h", 9.5)
+      )
+    }
+  )
+
+  output$ccc_png <- downloadHandler(
+    filename = function() resolve_download_filename(input$ccc_name, "Figure_6D", ".png"),
+    content = function(file){
+      dark_theme <- isolate(is_dark_mode())
+      p <- make_fig6D_static(input$ccc_lr_select, dark_theme = dark_theme)
+      save_ggplot_png(
+        file,
+        p,
+        width = download_dimension("ccc_w", 12),
+        height = download_dimension("ccc_h", 9.5)
+      )
     }
   )
   

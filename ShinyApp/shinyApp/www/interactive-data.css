@@ -33,6 +33,7 @@
   background: #ffffff;
   margin-bottom: 12px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
 
@@ -103,7 +104,129 @@ html[data-theme='dark'] .theme-card{
 }
 
 html[data-theme='dark'] .home-card-preview{
-  box-shadow: 0 8px 20px rgba(0,0,0,0.65);
+  box-shadow: none;
+  background: var(--plot-holder-bg, #050815);
+  filter: drop-shadow(0 14px 22px rgba(0,0,0,0.78));
+}
+
+.home-preview-dark{
+  display: none;
+}
+
+html[data-theme='dark'] .home-preview-light{
+  display: none;
+}
+
+html[data-theme='dark'] .home-preview-dark{
+  display: block;
+}
+
+#gene_search + .selectize-control .selectize-input,
+#gene_search ~ .selectize-control .selectize-input {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+
+#gene_search + .selectize-control.single .selectize-input > .item,
+#gene_search ~ .selectize-control.single .selectize-input > .item,
+#gene_search + .selectize-control.single .selectize-input > div,
+#gene_search ~ .selectize-control.single .selectize-input > div {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-shadow: none !important;
+}
+
+#gene_search + .selectize-control .selectize-input > input,
+#gene_search ~ .selectize-control .selectize-input > input {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  caret-color: currentColor;
+  -webkit-box-shadow: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+#gene_search + .selectize-control .selectize-input > input::placeholder,
+#gene_search ~ .selectize-control .selectize-input > input::placeholder {
+  color: rgba(71, 85, 105, 0.62) !important;
+  opacity: 1;
+}
+
+#gene_search + .selectize-control .selectize-input::selection,
+#gene_search ~ .selectize-control .selectize-input::selection,
+#gene_search + .selectize-control .selectize-input *::selection,
+#gene_search ~ .selectize-control .selectize-input *::selection {
+  background: rgba(37, 99, 235, 0.28);
+  color: #0f172a;
+  -webkit-text-fill-color: #0f172a;
+}
+
+#gene_search + .selectize-control .selectize-input::-moz-selection,
+#gene_search ~ .selectize-control .selectize-input::-moz-selection,
+#gene_search + .selectize-control .selectize-input *::-moz-selection,
+#gene_search ~ .selectize-control .selectize-input *::-moz-selection {
+  background: rgba(37, 99, 235, 0.28);
+  color: #0f172a;
+}
+
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input.focus,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input.focus,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input.input-active,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input.input-active,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input.dropdown-active,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input.dropdown-active {
+  background-color: var(--color-input-bg) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-control-border) !important;
+  caret-color: var(--color-text);
+}
+
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input.focus,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input.focus,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input.input-active,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input.input-active,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input.dropdown-active,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input.dropdown-active {
+  box-shadow: 0 0 0 3px var(--color-control-border-strong), 0 1px 0 rgba(2, 6, 23, 0.45) inset !important;
+}
+
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input > input,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input > input {
+  background: transparent !important;
+  color: var(--color-text) !important;
+  caret-color: var(--color-text);
+  -webkit-text-fill-color: var(--color-text) !important;
+}
+
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input > input::placeholder,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input > input::placeholder {
+  color: rgba(226, 232, 240, 0.65) !important;
+  opacity: 1;
+}
+
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input::selection,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input::selection,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input *::selection,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input *::selection {
+  background: rgba(147, 197, 253, 0.75);
+  color: #020617;
+  -webkit-text-fill-color: #020617;
+}
+
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input::-moz-selection,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input::-moz-selection,
+html[data-theme='dark'] #gene_search + .selectize-control .selectize-input *::-moz-selection,
+html[data-theme='dark'] #gene_search ~ .selectize-control .selectize-input *::-moz-selection {
+  background: rgba(147, 197, 253, 0.75);
+  color: #020617;
 }
 
 html[data-theme='dark'] .home-card-link:focus-visible .home-card{
@@ -263,6 +386,18 @@ html[data-theme='dark'] .theme-card{
   flex: 1 1 auto;
 }
 
+.spg-table-bg-dark {
+  display: none;
+}
+
+html[data-theme='dark'] .spg-table-bg-light {
+  display: none;
+}
+
+html[data-theme='dark'] .spg-table-bg-dark {
+  display: inline;
+}
+
 /* Optional: give the area some vertical space while loading */
 .svg-stage { 
   width: 100%;
@@ -323,6 +458,10 @@ html[data-theme='dark'] .ra-card.ra-plot.is-busy::before{
   outline-color: #4F46E5 !important;
 }
 
+html[data-theme='dark'] .cell-btn.btn-gmatch.btn-highlight {
+  outline-color: #fbbf24 !important;
+}
+
 /* Prevent native focus ring from stacking with our custom outlines */
 .cell-btn:focus { outline: none !important; }
 
@@ -371,6 +510,11 @@ button.custom-btn:focus-visible {
   fill: rgba(34, 211, 238, 0.18);
 }
 
+html[data-theme='dark'] .cell-btn.btn-gmatch {
+  stroke: #67e8f9;
+  fill: rgba(34, 211, 238, 0.24);
+}
+
 /* Modal selection override */
 .cell-btn.btn-highlight {
   stroke: #4F46E5 !important;
@@ -383,10 +527,24 @@ button.custom-btn:focus-visible {
   stroke: #4F46E5 !important;
 }
 
+html[data-theme='dark'] .cell-btn.btn-highlight {
+  stroke: #fbbf24 !important;
+  fill: rgba(251, 191, 36, 0.20) !important;
+}
+
+html[data-theme='dark'] .cell-btn.btn-gmatch.btn-highlight {
+  stroke: #fbbf24 !important;
+}
+
 .cell-btn,
 .cell-btn.btn-gmatch,
 .cell-btn.btn-highlight {
   outline: none !important;
+}
+
+.spg-modal-locked .cell-btn {
+  pointer-events: none;
+  cursor: wait;
 }
 
 .cell-btn.heat-on {
@@ -396,12 +554,22 @@ button.custom-btn:focus-visible {
 /* Optional: a tiny legend chip */
 .heat-legend {
   display: inline-flex; align-items: center; gap: 8px; font-size: 12px;
+  color: #334155;
 }
 
 .heat-gradient {
   width: 120px; height: 10px; border-radius: 999px;
   background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #084594);
   border: 1px solid #a5b7c6;
+}
+
+html[data-theme='dark'] .heat-legend {
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .heat-gradient {
+  background: linear-gradient(to right, #38bdf8, #22d3ee, #facc15);
+  border-color: rgba(226, 232, 240, 0.38);
 }
 
 .heat-legend-note {
@@ -417,8 +585,8 @@ html[data-theme='dark'] .heat-legend-note {
 
 
 .heat-label {
-  font: 25px/1 monospace;
-  fill: #111;
+  font: 700 15px/1.05 "Open Sans", sans-serif;
+  fill: #111827;
   text-anchor: middle;
   dominant-baseline: central;
   pointer-events: none;
@@ -426,6 +594,12 @@ html[data-theme='dark'] .heat-legend-note {
   stroke: #fff;         /* white halo for contrast */
   stroke-width: 2px;
   opacity: 0.9;
+}
+
+html[data-theme='dark'] .heat-label {
+  fill: #f8fafc;
+  stroke: #020617;
+  stroke-width: 3px;
 }
 
 

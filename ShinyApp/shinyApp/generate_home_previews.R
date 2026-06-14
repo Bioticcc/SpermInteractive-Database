@@ -88,9 +88,87 @@ write_runtime_preview <- function(source_path, target_path, height_px = runtime_
   invisible(target_path)
 }
 
+preview_dark_bg <- c(5, 8, 21) / 255
+
+preview_hue_rotate_matrix <- function(degrees) {
+  angle <- degrees * pi / 180
+  cos_a <- cos(angle)
+  sin_a <- sin(angle)
+  matrix(
+    c(
+      0.213 + cos_a * 0.787 - sin_a * 0.213,
+      0.715 - cos_a * 0.715 - sin_a * 0.715,
+      0.072 - cos_a * 0.072 + sin_a * 0.928,
+      0.213 - cos_a * 0.213 + sin_a * 0.143,
+      0.715 + cos_a * 0.285 + sin_a * 0.140,
+      0.072 - cos_a * 0.072 - sin_a * 0.283,
+      0.213 - cos_a * 0.213 - sin_a * 0.787,
+      0.715 - cos_a * 0.715 + sin_a * 0.715,
+      0.072 + cos_a * 0.928 + sin_a * 0.072
+    ),
+    nrow = 3,
+    byrow = TRUE
+  )
+}
+
+preview_saturate_matrix <- function(amount) {
+  matrix(
+    c(
+      0.213 + 0.787 * amount,
+      0.715 - 0.715 * amount,
+      0.072 - 0.072 * amount,
+      0.213 - 0.213 * amount,
+      0.715 + 0.285 * amount,
+      0.072 - 0.072 * amount,
+      0.213 - 0.213 * amount,
+      0.715 - 0.715 * amount,
+      0.072 + 0.928 * amount
+    ),
+    nrow = 3,
+    byrow = TRUE
+  )
+}
+
+write_dark_mode_preview <- function(source_path, target_path) {
+  img <- png::readPNG(source_path)
+  img_dims <- dim(img)
+  if (length(img_dims) < 3L || img_dims[[3]] < 3L) {
+    stop(sprintf("Expected RGB image data for %s", source_path))
+  }
+
+  rgb <- img[, , 1:3, drop = FALSE]
+  pixel_count <- img_dims[[1]] * img_dims[[2]]
+  rgb_flat <- matrix(rgb, ncol = 3)
+  original_flat <- rgb_flat
+
+  transform_matrix <- preview_saturate_matrix(1.05) %*% preview_hue_rotate_matrix(180)
+  filtered <- 1 - rgb_flat
+  filtered <- filtered %*% t(transform_matrix)
+  filtered <- filtered * 0.92
+  filtered <- (filtered - 0.5) * 0.96 + 0.5
+  filtered <- pmin(pmax(filtered, 0), 1)
+
+  luminance <- 0.2126 * original_flat[, 1] + 0.7152 * original_flat[, 2] + 0.0722 * original_flat[, 3]
+  chroma <- apply(original_flat, 1, function(pixel) max(pixel) - min(pixel))
+  bg_weight <- pmin(pmax((luminance - 0.86) / 0.12, 0), 1) *
+    pmin(pmax((0.14 - chroma) / 0.14, 0), 1)
+  if (any(bg_weight > 0)) {
+    filtered <- filtered * (1 - bg_weight) + matrix(
+      rep(preview_dark_bg, each = pixel_count),
+      ncol = 3
+    ) * bg_weight
+  }
+
+  img[, , 1:3] <- array(filtered, dim = c(img_dims[[1]], img_dims[[2]], 3))
+  png::writePNG(img, target_path)
+  invisible(target_path)
+}
+
 interactive_table_source_path <- file.path(output_dir, "interactiveTable.png")
 interactive_table_preview_path <- file.path(output_dir, "interactiveTable_preview.png")
+interactive_table_dark_preview_path <- file.path(output_dir, "interactiveTable_preview_dark.png")
 ra_runtime_preview_path <- file.path(output_dir, "ra_preview_publication_icon.png")
+ra_dark_runtime_preview_path <- file.path(output_dir, "ra_preview_publication_icon_dark.png")
 
 specific_obj <- readRDS(sc_first_existing(
   c("specificCellID_slim_nocounts.rds", "specificCellID_slim.rds", "specificCellID.rds"),
@@ -238,6 +316,7 @@ make_ra_lineplot <- function(obj, row1_genes, row2_genes, row3_genes) {
 dotplot_path <- file.path(reference_output_dir, "ra_dotplot_preview.png")
 lineplot_path <- file.path(reference_output_dir, "ra_lineplot_preview.png")
 heatmap_path <- file.path(output_dir, "ccc_heatmap_preview.png")
+heatmap_dark_path <- file.path(output_dir, "ccc_heatmap_preview_dark.png")
 
 dot_plot <- make_ra_dotplot(specific_obj, default_ra_genes, cell_types)
 ggsave(dotplot_path, dot_plot, width = 5.5, height = 3.5, dpi = 160)
@@ -250,6 +329,7 @@ line_plot <- make_ra_lineplot(
 )
 ggsave(lineplot_path, line_plot, width = 6.2, height = 3.6, dpi = 160)
 write_runtime_preview(lineplot_path, ra_runtime_preview_path)
+write_dark_mode_preview(ra_runtime_preview_path, ra_dark_runtime_preview_path)
 
 communication_score <- read.csv(sc_app_path("CellChat_all_stage_communication_score_LR_reverse.csv", app_dir = app_dir))
 if (!("lr_pair" %in% names(communication_score))) {
@@ -266,7 +346,7 @@ if (!length(selected_pairs)) {
 }
 selected_pairs <- head(selected_pairs, 10)
 
-make_fig6d_preview <- function(df, selection) {
+make_fig6d_preview <- function(df, selection, dark_theme = FALSE) {
   filtered <- df[df$lr_pair %in% selection,
                  c("lr_pair", "X_DARK_score", "X_PALE_score", "X_PALE2WEAK_score", "X_WEAK2STRONG_score")]
   if (!nrow(filtered)) {
@@ -278,30 +358,54 @@ make_fig6d_preview <- function(df, selection) {
   
   df_long <- reshape2::melt(mat, varnames = c("lr_pair", "stage"), value.name = "score")
   df_long$stage <- factor(df_long$stage, levels = c("I-VI", "VII-VIII", "IX-X", "XI-XII"))
+
+  axis_col <- if (dark_theme) "#e2e8f0" else "#1e293b"
+  bg_col <- if (dark_theme) "#050815" else "#ffffff"
+  border_col <- if (dark_theme) "#475569" else "#d1d5db"
+  fill_scale <- if (dark_theme) {
+    scale_fill_viridis_c(option = "B", name = "Score")
+  } else {
+    scale_fill_gradientn(
+      colours = c("#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#08306b"),
+      name = "Score"
+    )
+  }
   
   ggplot(df_long, aes(x = stage, y = lr_pair, fill = score)) +
     geom_tile() +
-    scale_fill_viridis_c(option = "B", name = "Score") +
+    fill_scale +
     labs(x = "Stage", y = "Ligand–Receptor Pair") +
     theme_minimal(base_size = 11) +
     theme(
-      axis.text.y = element_text(size = 7),
+      panel.background = element_rect(fill = bg_col, colour = NA),
+      plot.background = element_rect(fill = bg_col, colour = NA),
+      axis.text.x = element_text(color = axis_col),
+      axis.text.y = element_text(size = 7, color = axis_col),
+      axis.title = element_text(color = axis_col),
       panel.grid = element_blank(),
       legend.position = "right",
+      legend.background = element_rect(fill = bg_col, colour = border_col),
+      legend.text = element_text(color = axis_col),
+      legend.title = element_text(color = axis_col),
       plot.margin = unit(c(0.5, 0.6, 0.5, 1.2), "lines")
     )
 }
 
-heatmap_plot <- make_fig6d_preview(communication_score, selected_pairs)
-heatmap_source_path <- tempfile(pattern = "ccc_home_preview_", fileext = ".png")
-on.exit(unlink(heatmap_source_path, force = TRUE), add = TRUE)
-ggsave(heatmap_source_path, heatmap_plot, width = 5.4, height = 3.4, dpi = 160)
-write_runtime_preview(heatmap_source_path, heatmap_path)
+heatmap_light_plot <- make_fig6d_preview(communication_score, selected_pairs, dark_theme = FALSE)
+heatmap_dark_plot <- make_fig6d_preview(communication_score, selected_pairs, dark_theme = TRUE)
+heatmap_light_source_path <- tempfile(pattern = "ccc_home_preview_light_", fileext = ".png")
+heatmap_dark_source_path <- tempfile(pattern = "ccc_home_preview_dark_", fileext = ".png")
+on.exit(unlink(c(heatmap_light_source_path, heatmap_dark_source_path), force = TRUE), add = TRUE)
+ggsave(heatmap_light_source_path, heatmap_light_plot, width = 5.4, height = 3.4, dpi = 160)
+ggsave(heatmap_dark_source_path, heatmap_dark_plot, width = 5.4, height = 3.4, dpi = 160)
+write_runtime_preview(heatmap_light_source_path, heatmap_path)
+write_runtime_preview(heatmap_dark_source_path, heatmap_dark_path)
 
 if (!file.exists(interactive_table_source_path)) {
   stop(sprintf("Expected interactive table source image at %s", interactive_table_source_path))
 }
 write_runtime_preview(interactive_table_source_path, interactive_table_preview_path)
+write_dark_mode_preview(interactive_table_preview_path, interactive_table_dark_preview_path)
 
 message("Runtime preview images saved to ", output_dir)
 message("Reference preview images saved to ", reference_output_dir)

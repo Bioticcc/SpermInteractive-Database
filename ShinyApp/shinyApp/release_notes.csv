@@ -1,8 +1,34 @@
 "version_number","update_type","update_title","update_description","update_date"
-"0.6.4","Minor","","Added a bar that users can input a custom threshold for gene expression levels into. Doesnt require clicking search or a table refresh, just type in the number and itll change.","2026-04-02"
-"0.6.3","Minor","","Slight change to RA dot and line plots, as they would flash as if reloading despite reload button not be pressed.","2026-03-31"
-"0.6.2","Minor","","Just a lot of bug fixes, and mainly, moving the download buttons to the lefthand side of the pages, rather then on the figure container on the right.","2026-03-26"
-"0.6.1","Minor","","Relatively small resolution update, focusing on forcing container widths to remain consistent, among other things. Not much technical change, just a lot of CSS edits to fix up resolution and screen size related stuff.
-Also, weve got cell numbers and statistics working! Forgot that existed for a few monthes, actually.
-CURRENTLY KNOWN BUGS: - legend for gene coexpression is a thin sliver, due to css funkiness, i believe.","2026-03-24"
-"0.6","Major","Networking Update","This release focused on network and startup performance. The home page now avoids eagerly bootstrapping the staged and subset tabs, preview imagery was reduced to web-sized assets, and the initial #home startup payload is smaller than in earlier versions. The same release also included follow-up layout and responsiveness fixes across the interactive pages, plus cleanup for the spermatogonia modal and staged/subset statistics panels.","2026-03-24"
+"0.8.3","Minor","","* Updated dark mode UI so the logo is less jarring, as well as fixing other minor dark mode related bugs
+
+* Updated descriptions and explanation text for multiple sections.","2026-06-05"
+"0.8.2","Minor","","* Updated default settings for a few plots
+
+* Updates figure download options and fixed automatic refresh on the Interactive Data plots.
+
+* Added more default genes to the multiple geneExpr plot.","2026-06-03"
+"0.8.1","Major","Navigation Restructure and Figure Explanations","* Updated Patch Notes page to be more precise, as well as fixing a few typos.
+
+* Updated Proportion Plot to use Seurat clusters as a default, and changes x/y values.
+
+* Removed CellInfo vs CellInfo and GeneExpr vs GeneExpr tabs as they were redundant.
+
+* Updated navigation to be a more nested style. Subject to change, however.
+
+* Updated dark mode to invert home page prerview icons as well as making a dark move variation of the submenus.","2026-06-01"
+"0.7.1","Major","Multiple Gene Expression","* New page added to each main dataset tab, containing a dotplot and cell statistics table for the inputted gene(s), as well as allowing CSV input upload, given the correct input format/requirements.
+
+* Logo updated to remove a slightly off-color white background.
+
+* Added a legend toggle for downloads/displays of figures and plots.","2026-05-18"
+"0.6.4","Minor","","* Added a bar to the Spermatogonia Table page that users can input a custom threshold for gene expression levels into, which automatically updates the table with new cells above the threshold.","2026-04-02"
+"0.6.3","Minor","","* Slight change to RA dot and line plots, as they would flash as if reloading despite the reload button not being pressed.","2026-03-31"
+"0.6.2","Minor","","* General bug fixes.
+
+* Moved the download buttons to the left-hand side of the pages, rather than on the figure container on the right.","2026-03-26"
+"0.6.1","Minor","","* Relatively small resolution update, focusing on forcing container widths to remain consistent. Not much technical change, just a lot of CSS edits to fix up resolution issues.
+
+* Fixed the Cell Numbers and Statistics tables.","2026-03-24"
+"0.6","Major","Networking Update","* Using Firefox Developer Tools, we took a closer look at the networking of the site, as well as its startup performance, which at this stage was rather slow. Previously, the home page would fully load every other page on the site before allowing users in, which resulted in the aforementioned long startup times.
+
+* Preview icons were also shrunk marginally to again reduce load on the startup and page-loading processes.","2026-03-24"

@@ -13,7 +13,7 @@ theme_default <- theme_light
 # Shareable links should capture the full interactive state in the URL.
 enableBookmarking("url")
 
-make_interactive_explanation_box <- function() {
+make_interactive_explanation_box <- function(explanation_text) {
   tags$div(
     class = "figure-expl-wrap",
     tags$details(
@@ -27,21 +27,30 @@ make_interactive_explanation_box <- function() {
         tags$p(
           class = "ra-sub",
           style = "margin-bottom:0;",
-          "Explanation on why figure x is being shown here! what is important about this figure specifically? what does it mean?"
-        ),
-        tags$br(),
-        tags$br(),
-        tags$br(),
-        tags$br(),
-        tags$br(),
-        tags$br(),
-        tags$br(),
-        tags$br(),
-        tags$br()
+          explanation_text
+        )
       )
     )
   )
 }
+
+make_interactive_download_section <- function(button_id) {
+  tags$div(
+    class = "ra-rowgroup interactive-download-section",
+    tags$div(class = "ra-rowtitle", "Figure Downloads"),
+    actionButton(
+      inputId = button_id,
+      label = "Download Figures",
+      class = "btn btn-outline-primary ra-download-modal-trigger no-snapshot"
+    )
+  )
+}
+
+interactive_explanations <- list(
+  spermatogenesis_table = "The Interactive Spermatogenesis Table provides a visually intuitive, stage-by-stage reference for cell types present in the mouse testis, based on a modified version of the classic spermatogenesis diagram from Mäkelä et al. (JoVE 2020). Each tile in the table represents a specific cell type at a given seminiferous tubule stage (I-XII), and clicking any tile links directly to the matched cells in the single-nuclei dataset and gives users a list of marker genes for that cell type. Users can optionally query a gene of interest and set an expression threshold to overlay average expression values directly onto the tiles, with the color scale reflecting relative expression levels - tiles below the threshold remain unlabeled to reduce noise. This makes it straightforward to contextualize where a gene of interest is expressed within the developmental hierarchy of spermatogenesis.",
+  retinoic_acid_analysis = "The Retinoic Acid Analysis tab offers two complementary views for exploring the expression of retinoic acid pathway genes across the testicular cell atlas. The dot plot visualizes a user-selected set of RA-related genes (including Stra8, Stra6, Rbp1, Rbp4, Rdh10, Cyp26a1, Cyp26b1, Cyp26c1, Aldh1a1, Aldh1a2, and Aldh1a3) across any combination of annotated cell types, with dot size encoding the percentage of expressing cells and color encoding the scaled average expression level. The companion line plot displays expression trajectories for the same genes across spermatogenic stages, organized into three customizable gene rows to facilitate direct comparison of trends - for example, contrasting RA synthesis genes (Aldh1a1-3, Rdh10) against RA-responsive (Stra8, Stra6) and RA-degrading (Cyp26a1-c1, Rarg) factors.",
+  cell_to_cell_heatmap = "The Cell-to-Cell Communication tab presents a heatmap of ligand-receptor (LR) communication scores across four grouped seminiferous tubule stages (I-VI, VII-VIII, IX-X, and XI-XII). A curated panel of biologically relevant LR pairs is available for selection, spanning major signaling pathways involved in spermatogenesis including FGF/FGFR, IGF/IGF1R, KITL/KIT, GDNF/GFRA1, WNT/FZD, Notch (DLL/JAG-NOTCH), Hedgehog (DHH-PTCH1), CXCL12/CXCR4, PDGF, TGF-beta, and Semaphorin/Plexin pairs. The color intensity of each heatmap cell reflects the communication score for that LR pair at that stage grouping, enabling users to identify stage-specific peaks of paracrine or juxtacrine signaling and download customized heatmaps for publication or further analysis."
+)
 
 release_notes_path <- "release_notes.csv"
 
@@ -111,12 +120,35 @@ format_release_date <- function(value) {
 
 render_release_description <- function(text) {
   normalized <- gsub("\r\n?", "\n", text)
+  lines <- unlist(strsplit(normalized, "\n", fixed = TRUE))
+  lines <- trimws(lines)
+  lines <- lines[nzchar(lines)]
+
+  if (!length(lines)) {
+    return(list(tags$p("No release description provided.")))
+  }
+
+  is_bullet <- grepl("^\\*\\s+", lines)
+  if (all(is_bullet)) {
+    bullet_items <- sub("^\\*\\s+", "", lines)
+    return(list(tags$ul(lapply(bullet_items, tags$li))))
+  }
+
   paragraphs <- trimws(unlist(strsplit(normalized, "\n\\s*\n", perl = TRUE)))
   paragraphs <- paragraphs[nzchar(paragraphs)]
   if (!length(paragraphs)) {
-    paragraphs <- "No release description provided."
+    return(list(tags$p("No release description provided.")))
   }
-  lapply(paragraphs, function(paragraph) tags$p(paragraph))
+
+  lapply(paragraphs, function(paragraph) {
+    paragraph_lines <- trimws(unlist(strsplit(paragraph, "\n", fixed = TRUE)))
+    paragraph_lines <- paragraph_lines[nzchar(paragraph_lines)]
+    if (length(paragraph_lines) && all(grepl("^\\*\\s+", paragraph_lines))) {
+      bullet_items <- sub("^\\*\\s+", "", paragraph_lines)
+      return(tags$ul(lapply(bullet_items, tags$li)))
+    }
+    tags$p(paragraph)
+  })
 }
 
 make_patch_notes_entry <- function(entry, include_divider = FALSE) {
@@ -171,17 +203,17 @@ make_lazy_dataset_tab <- function(title, value) {
   )
 }
 
-make_lazy_dataset_menu <- function(menu_title, prefix) {
-  tab_specs <- list(
-    list(title = "Main Figures", suffix = "main_figures"),
-    list(title = "CellInfo vs GeneExpr", suffix = "cellinfo_gene"),
-    list(title = "CellInfo vs CellInfo", suffix = "cellinfo_cellinfo"),
-    list(title = "GeneExpr vs GeneExpr", suffix = "gene_gene"),
-    list(title = "Gene coexpression", suffix = "gene_coexpression"),
-    list(title = "Violinplot / Boxplot", suffix = "violin_boxplot"),
-    list(title = "Proportion plot", suffix = "proportion_plot"),
-    list(title = "Bubbleplot / Heatmap", suffix = "bubble_heatmap")
-  )
+dataset_tab_specs <- list(
+  list(title = "Main Figures", suffix = "main_figures"),
+  list(title = "CellInfo vs GeneExpr", suffix = "cellinfo_gene"),
+  list(title = "Multiple GeneExpr", suffix = "multiple_geneexpr"),
+  list(title = "Gene coexpression", suffix = "gene_coexpression"),
+  list(title = "Violinplot / Boxplot", suffix = "violin_boxplot"),
+  list(title = "Proportion plot", suffix = "proportion_plot"),
+  list(title = "Bubbleplot / Heatmap", suffix = "bubble_heatmap")
+)
+
+make_lazy_dataset_menu <- function(menu_title, prefix, tab_specs = dataset_tab_specs) {
 
   tabs <- lapply(tab_specs, function(tab_spec) {
     make_lazy_dataset_tab(
@@ -191,6 +223,72 @@ make_lazy_dataset_menu <- function(menu_title, prefix) {
   })
 
   do.call(navbarMenu, c(list(menu_title), tabs))
+}
+
+make_cell_subsets_menu <- function() {
+  subset_specs <- list(
+    list(title = "Sertoli", prefix = "sc4"),
+    list(title = "Spermatogonia", prefix = "sc5"),
+    list(title = "Spermatocyte", prefix = "sc6"),
+    list(title = "Spermatid", prefix = "sc7")
+  )
+
+  menu_items <- list()
+
+  for (subset_spec in subset_specs) {
+    menu_items <- c(
+      menu_items,
+      list(
+        make_lazy_dataset_tab(
+          title = subset_spec$title,
+          value = paste0(subset_spec$prefix, "_main_figures")
+        )
+      )
+    )
+  }
+
+  for (subset_spec in subset_specs) {
+    hidden_tabs <- lapply(dataset_tab_specs[-1], function(tab_spec) {
+      make_lazy_dataset_tab(
+        title = tab_spec$title,
+        value = paste0(subset_spec$prefix, "_", tab_spec$suffix)
+      )
+    })
+    menu_items <- c(menu_items, hidden_tabs)
+  }
+
+  do.call(navbarMenu, c(list("Cell Subsets"), menu_items))
+}
+
+interactive_data_nav_specs <- list(
+  list(title = "Spermatogenesis Table", value = "spermatogonia_table"),
+  list(title = "Retinoic Acid Analysis", value = "retinoic_acid"),
+  list(title = "Cell-to-Cell Heatmap", value = "cell2cell_heatmaps")
+)
+
+make_interactive_data_nav <- function(active_value) {
+  links <- lapply(interactive_data_nav_specs, function(nav_spec) {
+    classes <- c("subset-secondary-link")
+    if (identical(nav_spec$value, active_value)) {
+      classes <- c(classes, "is-active")
+    }
+
+    tags$a(
+      class = paste(classes, collapse = " "),
+      href = paste0("#", nav_spec$value),
+      role = "button",
+      `data-target-tab` = nav_spec$value,
+      `aria-current` = if (identical(nav_spec$value, active_value)) "page" else NULL,
+      onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
+      nav_spec$title
+    )
+  })
+
+  tags$nav(
+    class = "subset-secondary-nav",
+    `aria-label` = "Interactive data navigation",
+    tags$div(class = "subset-secondary-nav-inner", links)
+  )
 }
 
 shinyUI(
@@ -367,14 +465,20 @@ tags$head(
   # (A) Optional: tiny CSS for on-SVG numeric labels
   tags$style(HTML("
     .heat-label{
-      font: 15px/1 monospace;
-      fill:#111;
+      font: 15px/1.05 'Open Sans', sans-serif;
+      font-weight: 700;
+      fill:#111827;
       text-anchor: middle;
       dominant-baseline: central;
       pointer-events: none;
       paint-order: stroke;
       stroke: #fff; stroke-width: 2px;
       opacity: .9;
+    }
+    html[data-theme='dark'] .heat-label{
+      fill:#f8fafc;
+      stroke:#020617;
+      stroke-width: 3px;
     }
   ")),
   
@@ -383,6 +487,7 @@ tags$head(
   tags$script(HTML("
     (function () {
       var activeBtnId = null;
+      var spgModalLocked = false;
       var hasOwn = Object.prototype.hasOwnProperty;
 
       // ===== DEBUG TOGGLES =====
@@ -390,6 +495,15 @@ tags$head(
       var HEAT_LABEL_MODE = 'value';      // 'value' | 'scaled' | 'rank'
 
       function getNode(id) { return document.getElementById(id); }
+
+      function setSpgModalLocked(isLocked) {
+        spgModalLocked = !!isLocked;
+        var host = document.getElementById('spermatogonia_container');
+        if (host) {
+          if (spgModalLocked) host.classList.add('spg-modal-locked');
+          else host.classList.remove('spg-modal-locked');
+        }
+      }
 
       function clamp01(x) {
         if (!isFinite(x)) return 0;
@@ -426,6 +540,39 @@ tags$head(
         var g = rgb.g * t + 255 * (1 - t);
         var b = rgb.b * t + 255 * (1 - t);
         return rgbToHex(r, g, b);
+      }
+
+      function isDarkTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+      }
+
+      function interpolateHeatColor(scaled, stops) {
+        var t = clamp01(scaled);
+        var last = stops.length - 1;
+        var pos = t * last;
+        var idx = Math.min(last - 1, Math.floor(pos));
+        var frac = pos - idx;
+        var a = hexToRgb(stops[idx]);
+        var b = hexToRgb(stops[idx + 1]);
+        if (!a || !b) return stops[idx] || '#38bdf8';
+        return rgbToHex(
+          a.r + (b.r - a.r) * frac,
+          a.g + (b.g - a.g) * frac,
+          a.b + (b.b - a.b) * frac
+        );
+      }
+
+      function selectedHighlightVisual() {
+        if (isDarkTheme()) {
+          return {
+            stroke: '#fbbf24',
+            fill: 'rgba(251,191,36,0.20)'
+          };
+        }
+        return {
+          stroke: '#4F46E5',
+          fill: 'rgba(79,70,229,0.12)'
+        };
       }
 
 	      // ===== SVG helpers for heat labels =====
@@ -501,7 +648,18 @@ tags$head(
       // Click → server (open modal)
       document.addEventListener('click', function (e) {
         var btn = e.target.closest && e.target.closest('.cell-btn');
-        if (btn) Shiny.setInputValue('btn_click', btn.id, {priority: 'event'});
+        if (!btn) return;
+        if (spgModalLocked) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        setSpgModalLocked(true);
+        Shiny.setInputValue('btn_click', btn.id, {priority: 'event'});
+      });
+
+      Shiny.addCustomMessageHandler('spgModalLock', function (isLocked) {
+        setSpgModalLocked(isLocked);
       });
 
       Shiny.addCustomMessageHandler('highlightButton', function (btn_id) {
@@ -513,10 +671,11 @@ tags$head(
         el.dataset.restoreFill   = el.dataset.heatFill   || el.style.fill   || '';
         el.dataset.restoreAlpha  = el.dataset.heatAlpha  || el.style.fillOpacity || '';
 
+        var selectedVisual = selectedHighlightVisual();
         el.classList.add('btn-highlight');
-        el.style.stroke = '#4F46E5';
+        el.style.stroke = selectedVisual.stroke;
         el.style.strokeWidth = '3px';
-        el.style.fill = 'rgba(79,70,229,0.12)';
+        el.style.fill = selectedVisual.fill;
         el.style.fillOpacity = '1';
         activeBtnId = btn_id;
       });
@@ -551,9 +710,14 @@ tags$head(
 
       // FIX for earlier error: attach to document (always exists)
       document.addEventListener('hidden.bs.modal', function () {
-        if (!activeBtnId) return;
-        restoreHighlight(getNode(activeBtnId));
-        activeBtnId = null;
+        setSpgModalLocked(false);
+        if (window.Shiny) {
+          Shiny.setInputValue('__modal__closed__', Date.now(), {priority: 'event'});
+        }
+        if (activeBtnId) {
+          restoreHighlight(getNode(activeBtnId));
+          activeBtnId = null;
+        }
       });
 
       document.addEventListener('mousedown', function (e) {
@@ -637,12 +801,24 @@ tags$head(
           var scaledRaw = (typeof info.scaled === 'number') ? info.scaled : parseFloat(info.scaled);
           var hasScaled = isFinite(scaledRaw);
           var scaled = hasScaled ? clamp01(scaledRaw) : null;
-          var mix = (scaled === null) ? 0.75 : (0.35 + 0.65 * scaled);
-          var fillColor = mixWithWhite(color, mix);
-          var alpha = (scaled === null) ? 0.75 : (0.65 + 0.25 * scaled);
+          var darkMode = isDarkTheme();
+          var fillColor;
+          var alpha;
+          var strokeColor;
+          if (darkMode) {
+            color = hasScaled ? interpolateHeatColor(scaled, ['#38bdf8', '#22d3ee', '#facc15']) : '#38bdf8';
+            fillColor = color;
+            strokeColor = mixWithWhite(color, 0.82);
+            alpha = (scaled === null) ? 0.62 : (0.48 + 0.34 * scaled);
+          } else {
+            var mix = (scaled === null) ? 0.75 : (0.35 + 0.65 * scaled);
+            fillColor = mixWithWhite(color, mix);
+            strokeColor = color;
+            alpha = (scaled === null) ? 0.75 : (0.65 + 0.25 * scaled);
+          }
 
           // Remember values for restore
-          el.dataset.heatStroke = color;
+          el.dataset.heatStroke = strokeColor;
           el.dataset.heatFill   = fillColor;
           el.dataset.heatAlpha  = String(alpha);
           if (info.rank !== undefined && info.rank !== null) el.dataset.heatRank = String(info.rank); else delete el.dataset.heatRank;
@@ -661,11 +837,11 @@ tags$head(
 
           // Apply to SVG
           if (el.classList.contains('btn-highlight')) {
-            el.dataset.restoreStroke = color;
+            el.dataset.restoreStroke = strokeColor;
             el.dataset.restoreFill   = fillColor;
             el.dataset.restoreAlpha  = String(alpha);
           } else {
-            applyHeatVisual(el, color, fillColor, String(alpha));
+            applyHeatVisual(el, strokeColor, fillColor, String(alpha));
           }
 
 	          // Draw numeric label for the searched gene values.
@@ -752,7 +928,7 @@ tags$div(
       target = "_blank",
       `aria-label` = "Wei Yan Lab website (opens in a new tab)",
       tags$img(
-        src = "logo.png",
+        src = "yanlablogo.png",
         alt = "Wei Yan Lab Logo"
       )
     )
@@ -957,13 +1133,13 @@ navbarPage(
         width = 8,
         div(class = "home-card home-hero",
             h2("Welcome"),
-            p("Explore gene expression throughout mouse spermatogenesis with an an intuitive, interactive interface. ",
+            p("Explore gene expression throughout mouse spermatogenesis with an intuitive, interactive interface. ",
               "Query your genes of interest, visualize stage-specific expression patterns, and export publication-ready figures - no coding required! ",
-              "The current release features our staged testis atlas, with developmental time-course and spatial transcription datasets coming soon"),
+              "The current release features our full stage-resolved transcriptomic atlas of seminiferous tubules, with developmental time-course, spatial transcriptomic datasets, and additional modalities coming soon."),
             p(tags$strong("Feedback:")),
             tags$ul(
-              tags$li("adamward.bio@gmail for database developer related questions"),
-              tags$li("hayden.mcswiggin@wsu.edu for database/paper science questions")
+              tags$li("adam.ward@wsu.edu for database development/code related questions"),
+              tags$li("hayden.mcswiggin@wsu.edu for database/paper science related questions")
             )
         )
       ),
@@ -972,7 +1148,7 @@ navbarPage(
         div(class = "home-card get-started",
             h3("Get Started"),
             tags$ol(
-              tags$li("Open the Staged Testis or Interactive Data tabs from the navigation bar."),
+              tags$li("Open the Full Atlas or Interactive Data tabs from the navigation bar."),
               tags$li("Pick a figure type and set filters (genes, stages, cell groups)."),
               tags$li("Customize aesthetics and download your figure.")
             ),
@@ -992,7 +1168,7 @@ navbarPage(
       column(
         width = 12,
         div(class = "home-card",
-            h3("Our Custom Interactive Figures (Based on Staged Testis Dataset)"),
+            h3("Explore the Atlas: Featured Interactive Analyses"),
             p("These interactive views reproduce and extend figures from the paper using our pre-loaded Seurat objects:"),
             tags$div(
               class = "row home-icon-grid",
@@ -1009,12 +1185,18 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "interactiveTable_preview.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview home-preview-light",
+                      loading = "lazy",
+                      alt = "Preview of the spermatogenesis interactive table"
+                    ),
+                    tags$img(
+                      src = "interactiveTable_preview_dark.png",
+                      class = "home-card-preview home-preview-dark",
                       loading = "lazy",
                       alt = "Preview of the spermatogenesis interactive table"
                     ),
                     h4("Spermatogenesis Interactive Table"),
-                    p("Navigate the stage-positioned table to open context-specific modals with curated gene lists and matched cell subsets.")
+                    p("Browse all spermatogenic cell types and their stage-specific marker genes, or enter a gene of interest to visualize its expression across the full spermatogenesis landscape as an interactive heatmap.")
                   )
                 )
               ),
@@ -1031,12 +1213,18 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "ra_preview_publication_icon.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview home-preview-light",
+                      loading = "lazy",
+                      alt = "Preview of the RA line plot figure"
+                    ),
+                    tags$img(
+                      src = "ra_preview_publication_icon_dark.png",
+                      class = "home-card-preview home-preview-dark",
                       loading = "lazy",
                       alt = "Preview of the RA line plot figure"
                     ),
                     h4("Retinoic Acid Analysis"),
-                    p("Explore RA gene expression across cell populations and developmental trajectories, recreating Figures 5A–B to your own specifications")
+                    p("Investigate how retinoic acid signaling genes are expressed across spermatogenic cell types and stages.")
                   )
                 )
               ),
@@ -1053,12 +1241,18 @@ navbarPage(
                     class = "home-card",
                     tags$img(
                       src = "ccc_heatmap_preview.png",
-                      class = "home-card-preview",
+                      class = "home-card-preview home-preview-light",
                       loading = "lazy",
                       alt = "Preview of the cell-to-cell communication heatmap"
                     ),
-                    h4("Cell-Cell Communication Analysis"),
-                    p("Visualize ligand–receptor communication scores across stages, select LR pairs, and download customized heatmaps.")
+                    tags$img(
+                      src = "ccc_heatmap_preview_dark.png",
+                      class = "home-card-preview home-preview-dark",
+                      loading = "lazy",
+                      alt = "Preview of the cell-to-cell communication heatmap"
+                    ),
+                    h4("Cell-Cell Communication"),
+                    p("Explore predicted ligand–receptor signaling interactions between cell types at each spermatogenic stage. Filter by LR pairs of interest and export publication-ready heatmaps.")
                   )
                 )
               )
@@ -1072,100 +1266,108 @@ navbarPage(
   
   
   make_patch_notes_page(),
-  
-  
-    navbarMenu(
-  "Interactive Data",
-  
   # =========================
   # SPERMATOGENESIS TABLE (PNG only)
   # =========================
   tabPanel(
-    "Spermatogenesis Table",
+    "Interactive Data",
     value = "spermatogonia_table",
     tags$div(
-      class = "ra-pane",
-      
-      # ---- LEFT: controls card ----
+      class = "legacy-stack interactive-data-stack",
+      make_interactive_data_nav("spermatogonia_table"),
       tags$div(
-        class = "ra-card ra-controls glass-card",
+        class = "ra-pane",
+
+        # ---- LEFT: controls card ----
         tags$div(
-          class = "ra-card-head",
-          tags$h3(class = "ra-title", "Spermatogenesis Controls"),
-          tags$p(class = "ra-sub", "Optional filters for highlighting/querying genes.")
-        ),
-        tags$div(
-          class = "ra-field",
-          tags$label(class = "ra-label", "Gene query"),
-          textInput(
-            inputId = "gene_search",
-            label = NULL,
-            placeholder = "Type a gene…",
-            width = "100%"
-          )
-        ),
-        tags$div(
-          class = "ra-field",
-          tags$label(class = "ra-label", "Expression threshold"),
-          numericInput(
-            inputId = "spg_expr_threshold",
-            label = NULL,
-            value = default_spg_expr_threshold,
-            min = 0,
-            step = 0.001,
-            width = "100%"
+          class = "ra-card ra-controls glass-card",
+          tags$div(
+            class = "ra-card-head",
+            tags$h3(class = "ra-title", "Spermatogenesis Controls"),
+            tags$p(class = "ra-sub", "Optional filters for highlighting/querying genes.")
           ),
-          uiOutput("spg_expr_threshold_help")
-        ),
-        tags$div(
-          class = "ra-field",
-          style = "margin-bottom: 14px;",
-          actionButton(
-            inputId = "gene_search_btn",
-            label   = "Search",
-            icon    = icon("search"),
-            class   = "btn btn-primary btn-sm"
+          tags$div(
+            class = "ra-field",
+            tags$label(class = "ra-label", "Gene query"),
+            selectizeInput(
+              inputId = "gene_search",
+              label = NULL,
+              choices = NULL,
+              selected = NULL,
+              multiple = FALSE,
+              options = list(
+                placeholder = "Type a gene…",
+                create = TRUE,
+                persist = FALSE,
+                maxOptions = 20,
+                openOnFocus = FALSE
+              ),
+              width = "100%"
+            )
+          ),
+          tags$div(
+            class = "ra-field",
+            tags$label(class = "ra-label", "Expression threshold"),
+            numericInput(
+              inputId = "spg_expr_threshold",
+              label = NULL,
+              value = default_spg_expr_threshold,
+              min = 0,
+              step = 0.001,
+              width = "100%"
+            ),
+            uiOutput("spg_expr_threshold_help")
+          ),
+          tags$div(
+            class = "ra-field",
+            style = "margin-bottom: 14px;",
+            actionButton(
+              inputId = "gene_search_btn",
+              label   = "Search",
+              icon    = icon("search"),
+              class   = "btn btn-primary btn-sm"
+            )
+          ),
+          div(
+            class = "heat-legend",
+            span("Lower expr"),
+            div(class = "heat-gradient"),
+            span("Higher expr")
+          ),
+          tags$p(
+            class = "heat-legend-note",
+            "Overlay values represent the mean RNA expression of the queried gene per cell type and stage. Color intensity reflects expression level; tiles below the threshold are not labeled."
           )
         ),
-        div(
-          class = "heat-legend",
-          span("Lower expr"),
-          div(class = "heat-gradient"),
-          span("Higher expr")
-        ),
-        tags$p(
-          class = "heat-legend-note",
-          "Overlay numbers show the average expression of the searched gene for the cells in each tile (RNA data); higher values mean higher expression. Tiles below the threshold are unlabeled."
+
+        # ---- RIGHT: figure card ----
+        tags$div(
+          class = "ra-card ra-plot glass-card",
+          style = "position:relative;",
+
+
+          # Card header
+          tags$div(
+            class = "ra-card-head",
+            tags$h3(class = "ra-title", "Interactive Spermatogenesis Table"),
+            tags$p(class = "ra-sub", "Click a cell to view matched cells in the dataset.")
+          ),
+
+          # Capture container (what the PNG will include)
+          tags$div(
+            id = "spermatogonia_container",
+            style = "border-radius:12px;",
+            sc_spinner_ui_output("spermatogonia_svg")
+          ),
+          tags$p(
+            class = "ra-sub",
+            HTML("Image Modified from M&auml;kel&auml; et. al. JoVE 2020, "),
+            a("https://dx.doi.org/10.3791/61800", href = "https://dx.doi.org/10.3791/61800", target = "_blank")
+          )
         )
       ),
-      
-      # ---- RIGHT: figure card ----
-      tags$div(
-        class = "ra-card ra-plot glass-card",
-        style = "position:relative;",
-        
-        
-        # Card header
-        tags$div(
-          class = "ra-card-head",
-          tags$h3(class = "ra-title", "Interactive Spermatogenesis Table"),
-          tags$p(class = "ra-sub", "Click a cell to view matched cells in the dataset.")
-        ),
-        
-        # Capture container (what the PNG will include)
-        tags$div(
-          id = "spermatogonia_container",
-          style = "border-radius:12px;",
-          sc_spinner_ui_output("spermatogonia_svg")
-        ),
-        tags$p(
-          class = "ra-sub",
-          HTML("Image Modified from M&auml;kel&auml; et. al. JoVE 2020, "),
-          a("https://dx.doi.org/10.3791/61800", href = "https://dx.doi.org/10.3791/61800", target = "_blank")
-        )
-      )
-    ),
-    make_interactive_explanation_box()
+      make_interactive_explanation_box(interactive_explanations$spermatogenesis_table)
+    )
   ),
   
   # ==========================================
@@ -1175,77 +1377,65 @@ navbarPage(
     "Retinoic Acid Analysis",
     value = "retinoic_acid",
     tags$div(
-      class = "ra-pane",
-      
-      # LEFT: controls
+      class = "legacy-stack interactive-data-stack",
+      make_interactive_data_nav("retinoic_acid"),
       tags$div(
-        class = "ra-card ra-controls glass-card",
+        class = "ra-pane",
+
+        # LEFT: controls
         tags$div(
-          class = "ra-card-head",
-          tags$h3(class = "ra-title", "Retinoic Acid (RA) Controls"),
-          tags$p(class = "ra-sub", "Choose genes and cell types to show in the dot plot.")
-        ),
-        tags$div(
-          class = "ra-field",
-          tags$label(class = "ra-label", "Select RA Genes"),
-          selectizeInput(
-            inputId = "ra_genes", label = NULL,
-            choices = NULL, selected = NULL, multiple = TRUE,
-            options = list(placeholder = "Select or type genes"),
-            width = "100%"
-          )
-        ),
-        tags$div(
-          class = "ra-field ra-sidebar-action-row",
-          actionButton(
-            inputId = "ra_dot_refresh",
-            label = "Reload Figure",
-            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot",
-            title = "Refresh plot"
+          class = "ra-card ra-controls glass-card",
+          tags$div(
+            class = "ra-card-head",
+            tags$h3(class = "ra-title", "Retinoic Acid (RA) Controls"),
+            tags$p(class = "ra-sub", "Choose genes and cell types to show in the dot plot.")
           ),
-          downloadButton(
-            outputId = "ra_dotplot_pdf",
-            label = "Download PDF",
-            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot"
-          )
+          tags$div(
+            class = "ra-field",
+            tags$label(class = "ra-label", "Select RA Genes"),
+            selectizeInput(
+              inputId = "ra_genes", label = NULL,
+              choices = NULL, selected = NULL, multiple = TRUE,
+              options = list(placeholder = "Select or type genes"),
+              width = "100%"
+            )
+          ),
+          tags$div(
+            class = "ra-field",
+            tags$label(class = "ra-label", "Cell Types"),
+            checkboxGroupInput(
+              inputId = "ra_cell_types", label = NULL,
+              choices = NULL, selected = NULL, width = "100%"
+            )
+          ),
+          make_interactive_download_section("ra_dot_downloads_open")
         ),
+
+        # RIGHT: plot card
         tags$div(
-          class = "ra-field",
-          tags$label(class = "ra-label", "Cell Types"),
-          checkboxGroupInput(
-            inputId = "ra_cell_types", label = NULL,
-            choices = NULL, selected = NULL, width = "100%"
+          class = "ra-card ra-plot glass-card",
+          style = "position:relative;",
+
+          tags$div(
+            class = "ra-card-head",
+            tags$div(
+              class = "ra-head-main",
+              tags$h3(class = "ra-title", "DotPlot")
+            ),
+            tags$p(class = "ra-sub", "Expression of selected RA genes across chosen cell types.")
+          ),
+          # Capture container
+          tags$div(
+            id = "ra_dotplot_container",
+            style = "padding:12px; border-radius:12px;",
+            sc_spinner_plot_output("ra_dotplot", height = "750px", width = "100%")
           )
         )
       ),
-      
-      # RIGHT: plot card
+      tags$hr(class = "ra-divider"),
+
       tags$div(
-        class = "ra-card ra-plot glass-card",
-        style = "position:relative;",
-
-        tags$div(
-          class = "ra-card-head",
-          tags$div(
-            class = "ra-head-main",
-            tags$h3(class = "ra-title", "DotPlot")
-          ),
-          tags$p(class = "ra-sub", "Expression of selected RA genes across chosen cell types.")
-        ),
-        # Capture container
-        tags$div(
-          id = "ra_dotplot_container",
-          style = "padding:12px; border-radius:12px;",
-          sc_spinner_plot_output("ra_dotplot", height = "750px", width = "100%")
-        )
-      )
-    ),
-    make_interactive_explanation_box(),
-
-    tags$hr(class = "ra-divider"),
-
-    tags$div(
-      class = "ra-pane",
+        class = "ra-pane",
       
       # LEFT: controls
       tags$div(
@@ -1288,20 +1478,7 @@ navbarPage(
             width = "100%"
           )
         ),
-        tags$div(
-          class = "ra-field ra-sidebar-action-row",
-          actionButton(
-            inputId = "ra_line_refresh",
-            label = "Reload Figure",
-            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot",
-            title = "Refresh plot"
-          ),
-          downloadButton(
-            outputId = "ra_lineplot_pdf",
-            label = "Download PDF",
-            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot"
-          )
-        )
+        make_interactive_download_section("ra_line_downloads_open")
       ),
       
       # RIGHT: plot card
@@ -1324,8 +1501,9 @@ navbarPage(
           sc_spinner_plot_output("ra_lineplot", height = "750px", width = "100%")
         )
       )
-    ),
-    make_interactive_explanation_box()
+      ),
+      make_interactive_explanation_box(interactive_explanations$retinoic_acid_analysis)
+    )
   ),
   
   # ============================================
@@ -1335,73 +1513,66 @@ navbarPage(
     "Cell-to-Cell Heatmap",
     value = "cell2cell_heatmaps",
     tags$div(
-      class = "ra-pane",
-      
-      # LEFT: controls
+      class = "legacy-stack interactive-data-stack",
+      make_interactive_data_nav("cell2cell_heatmaps"),
       tags$div(
-        class = "ra-card ra-controls glass-card",
+        class = "ra-pane",
+
+        # LEFT: controls
         tags$div(
-          class = "ra-card-head",
-          tags$h3(class = "ra-title", "Cell-to-Cell Controls"),
-          tags$p(class = "ra-sub", "Choose ligand–receptor pairs to visualize communication scores.")
-        ),
-        tags$div(
-          class = "ra-field",
-          tags$label(class = "ra-label", "Ligand–Receptor Pairs"),
-          selectizeInput(
-            inputId = "ccc_lr_select", label = NULL,
-            choices = NULL, multiple = TRUE,
-            options = list(placeholder = "Choose ligand–receptor pairs..."),
-            width = "100%"
-          )
-        ),
-        tags$div(
-          class = "ra-field ra-sidebar-action-row",
-          actionButton(
-            inputId = "ccc_refresh",
-            label = "Reload Figure",
-            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot",
-            title = "Refresh heatmap"
+          class = "ra-card ra-controls glass-card",
+          tags$div(
+            class = "ra-card-head",
+            tags$h3(class = "ra-title", "Cell-to-Cell Controls"),
+            tags$p(class = "ra-sub", "Choose ligand–receptor pairs to visualize communication scores.")
           ),
-          downloadButton(
-            outputId = "ccc_pdf",
-            label = "Download PDF",
-            class = "ra-btn ra-download-btn ra-sidebar-action-btn no-snapshot"
+          tags$div(
+            class = "ra-field",
+            tags$label(class = "ra-label", "Ligand–Receptor Pairs"),
+            selectizeInput(
+              inputId = "ccc_lr_select", label = NULL,
+              choices = NULL, multiple = TRUE,
+              options = list(placeholder = "Choose ligand–receptor pairs..."),
+              width = "100%"
+            )
+          ),
+          make_interactive_download_section("ccc_downloads_open")
+        ),
+
+        # RIGHT: plot card
+        tags$div(
+          class = "ra-card ra-plot glass-card",
+          style = "position:relative;",
+
+          tags$div(
+            class = "ra-card-head",
+            tags$div(
+              class = "ra-head-main",
+              tags$h3(class = "ra-title", "Heatmap")
+            ),
+            tags$p(class = "ra-sub", "Communication scores across stages for selected LR pairs.")
+          ),
+
+          # Capture container
+          tags$div(
+            id = "ccc_heatmap_container",
+            style = "padding:12px; border-radius:12px;",
+            sc_spinner_plotly_output("ccc_heatmap", height = "680px", width = "100%")
           )
         )
       ),
-      
-      # RIGHT: plot card
-      tags$div(
-        class = "ra-card ra-plot glass-card",
-        style = "position:relative;",
-        
-        tags$div(
-          class = "ra-card-head",
-          tags$div(
-            class = "ra-head-main",
-            tags$h3(class = "ra-title", "Heatmap")
-          ),
-          tags$p(class = "ra-sub", "Communication scores across stages for selected LR pairs.")
-        ),
-        
-        # Capture container
-        tags$div(
-          id = "ccc_heatmap_container",
-          style = "padding:12px; border-radius:12px;",
-          sc_spinner_plotly_output("ccc_heatmap", height = "680px", width = "100%")
-        )
-      )
-    ),
-    make_interactive_explanation_box()
-  )
-),
+      make_interactive_explanation_box(interactive_explanations$cell_to_cell_heatmap)
+    )
+  ),
 
-make_lazy_dataset_menu("Staged Testis", "sc3"),
-make_lazy_dataset_menu("Sertoli Subset", "sc4"),
-make_lazy_dataset_menu("Spermatogonia Subset", "sc5"),
-make_lazy_dataset_menu("Spermatocyte Subset", "sc6"),
-make_lazy_dataset_menu("Spermatid Subset", "sc7"),
+make_lazy_dataset_tab("Full Atlas", "sc3_main_figures"),
+make_lazy_dataset_tab("CellInfo vs GeneExpr", "sc3_cellinfo_gene"),
+make_lazy_dataset_tab("Multiple GeneExpr", "sc3_multiple_geneexpr"),
+make_lazy_dataset_tab("Gene coexpression", "sc3_gene_coexpression"),
+make_lazy_dataset_tab("Violinplot / Boxplot", "sc3_violin_boxplot"),
+make_lazy_dataset_tab("Proportion plot", "sc3_proportion_plot"),
+make_lazy_dataset_tab("Bubbleplot / Heatmap", "sc3_bubble_heatmap"),
+make_cell_subsets_menu(),
 
 
 
@@ -1411,7 +1582,7 @@ br(),
 p(
   strong("Reference: "),
   "Hayden McSwiggin, ",
-  "Single Nuclei Analysis of Staged Seminifierous Tubules (Unpublished, expected mid 2026)",
+  "Single Nuclei Analysis of Staged Seminiferous Tubules (Unpublished, expected mid 2026)",
   style = "font-size: 125%;"
 ), 
 p(

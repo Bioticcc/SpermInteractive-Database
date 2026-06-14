@@ -17,12 +17,15 @@ app_dir <- normalizePath(file.path(project_dir, "shinyApp"), mustWork = FALSE)
 release_notes_file <- normalizePath(file.path(app_dir, "release_notes.csv"), mustWork = FALSE)
 
 # ---- Release metadata: edit these before deploying ----
-release_version_number <- "0.6.4"
+release_version_number <- "0.8.3"
 release_update_type <- "Minor"   # "Minor" or "Major"
-release_update_title <- "Added custom expression levels to Spermatogenesis table"
+release_update_title <- "Navigation Restructure and Figure Explanations"
 release_update_description <- paste(
-  "Added a bar that users can input a custom threshold for gene expression levels into. Doesnt require clicking search or a table refresh, just type in the number and itll change. ",
-  sep = "\n\n"
+  c(
+    "* Updated dark mode UI so the logo is less jarring, as well as fixing other minor dark mode related bugs",
+    "* Updated descriptions and explanation text for multiple sections."
+  ),
+  collapse = "\n\n"
 )
 
 validate_release_inputs <- function(version_number,
@@ -135,14 +138,16 @@ sync_release_notes()
 # Rscript ShinyApp/shinyApp/bench_memory_usage.R
 
 #------DEPLOY TO SHINYAPPS.IO------->
-# if (interactive()) {
-#   if (!requireNamespace("rsconnect", quietly = TRUE)) {
-#     install.packages("rsconnect")
-#   }
-#   rsconnect::setAccountInfo(name='ward-bio', token='NUH-UH', secret='ItsASecret :P')
-#
-#   # Just rerun this when making updates.
+# Set to TRUE only when you intentionally want to deploy.
+deploy_to_shinyapps <- TRUE
+
+if (isTRUE(deploy_to_shinyapps)) {
+  if (!requireNamespace("rsconnect", quietly = TRUE)) {
+    install.packages("rsconnect")
+  }
+  # rsconnect::setAccountInfo(name='ward-bio', token='NUH-UH', secret='ItsASecret :P')
+
   sync_release_notes(update_date = Sys.Date())
   rsconnect::deployApp(appDir = app_dir, appName = "SpermInteractive", forceUpdate = TRUE)
-# }
+}
 #--------------------------------------->

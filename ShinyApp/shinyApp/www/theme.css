@@ -815,20 +815,28 @@ html[data-theme='dark'] .spg-modal-summary {
 html[data-theme='dark'] .spg-modal-gene-table table,
 html[data-theme='dark'] .spg-modal-gene-table th,
 html[data-theme='dark'] .spg-modal-gene-table td {
-  color: var(--color-text);
+  color: var(--color-text) !important;
 }
 
 html[data-theme='dark'] .spg-modal-gene-table table {
-  background: rgba(12, 18, 35, 0.92);
-  border-color: rgba(99, 102, 241, 0.32);
+  background: #050815 !important;
+  border-color: rgba(99, 102, 241, 0.32) !important;
+}
+
+html[data-theme='dark'] .spg-modal-gene-table tbody,
+html[data-theme='dark'] .spg-modal-gene-table tr,
+html[data-theme='dark'] .spg-modal-gene-table td {
+  background: #050815 !important;
 }
 
 html[data-theme='dark'] .spg-modal-gene-table th {
-  background: rgba(99, 102, 241, 0.24);
+  background: #0f1b36 !important;
+  color: #f8fafc !important;
 }
 
-html[data-theme='dark'] .spg-modal-gene-table tr:nth-child(even) {
-  background: rgba(12, 18, 35, 0.82);
+html[data-theme='dark'] .spg-modal-gene-table tr:nth-child(even),
+html[data-theme='dark'] .spg-modal-gene-table tr:nth-child(even) td {
+  background: #081426 !important;
 }
 
 html[data-theme='dark'] .spg-modal-gene-table::-webkit-scrollbar-thumb {

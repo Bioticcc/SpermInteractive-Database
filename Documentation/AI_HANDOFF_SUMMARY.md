@@ -10,7 +10,7 @@ It summarizes:
 - the current operational and deployment surfaces
 - the main remaining risks
 
-Current snapshot date: `2026-04-02`
+Current snapshot date: `2026-06-02`
 
 ## Environment Snapshot
 - Repo root: `/home/biotic/ShinyApp Project`
@@ -78,6 +78,15 @@ Important note:
 - Each of `sc3` to `sc7` now has a `Main Figures` page.
 - Shared dataset controls now include a stage-split toggle for embedding-based tabs.
 - Download flows for staged/subset figures now open modal-based export dialogs with optional custom filenames.
+- Primary navigation now exposes `Full Atlas` as a single top-level page and `Cell Subsets` as a dropdown of subset names only.
+- Detailed `sc3` to `sc7` pages are still registered as tabs for lazy routing and URL hashes, but secondary page navigation happens through embedded mini nav bars.
+
+### 5a. Primary navbar and embedded mini navigation
+- `Full Atlas` opens `sc3_main_figures`; the remaining `sc3_*` pages are hidden from the primary navbar and reached through the embedded dataset mini nav.
+- `Cell Subsets` opens each subset's Main Figures page (`sc4_main_figures` to `sc7_main_figures`); the remaining subset pages are hidden from the dropdown and reached through the same embedded dataset mini nav.
+- `Interactive Data` opens `spermatogonia_table`; `retinoic_acid` and `cell2cell_heatmaps` remain registered tabs but are hidden from the primary navbar and reached through the embedded interactive-data mini nav.
+- The header patch-notes link opens the hidden `patch_notes` tab; both its anchor and parent navbar item are hidden to avoid creating a blank gap between top-level navbar entries.
+- Do not remove hidden registered tab panels just because they are not visible in the primary navbar: they are required for `window.navToTab(...)`, hash/history routing, and Shiny lazy initialization.
 
 ### 6. The spermatogenesis interactive table is richer than before
 - The interactive table still uses `interactiveTable.png` as the art asset, but the clickable surface is now an SVG with generated rectangle overlays in `server.R`.
@@ -102,7 +111,7 @@ Per dataset prefix, runtime uses:
 - `scNgexpr.h5`
 
 These drive:
-- staged testis main figures
+- Full Atlas main figures
 - subset main figures
 - staged/subset detailed tabs
 - stage-split views inside the generic dataset binder
@@ -143,6 +152,8 @@ At app root:
 - share-link clipboard copy
 - navbar dropdown auto-close and hash/history syncing
 - SVG highlighting and heat overlay behavior for the interactive table
+- hidden-primary-tab CSS for secondary pages and patch notes
+- embedded mini navigation for interactive-data pages
 
 ### 5. Separate interactive-data logic still exists
 The following remain custom runtime paths outside the generic ShinyCell dataset binder:
@@ -156,13 +167,13 @@ The following remain custom runtime paths outside the generic ShinyCell dataset 
 
 ### Runtime-critical source files
 - `ShinyApp/shinyApp/ui.R`
-  - builds the header, home page, patch notes page, interactive-data tabs, and lazy placeholders for `sc3` to `sc7`
+  - builds the header, home page, patch notes page, interactive-data tabs, embedded interactive-data navigation, and lazy placeholders for `sc3` to `sc7`
   - owns theme-toggle, tab-history, SVG heat-overlay, and navbar JS bootstrapping
 - `ShinyApp/shinyApp/server.R`
   - main runtime logic
   - owns plotting helpers, lazy active bindings, first-open dataset initialization, interactive-data logic, bookmarking/share-link handling, and lag profiling
 - `ShinyApp/shinyApp/ra_tabs.R`
-  - shared UI builders for main figures and detailed dataset tabs
+  - shared UI builders for main figures, detailed dataset tabs, and the embedded dataset mini navigation
 - `ShinyApp/shinyApp/app_support.R`
   - shared runtime support layer for path discovery, loaders, spinners, and gene-index normalization
 - `ShinyApp/shinyApp/metadata_overrides.R`
@@ -231,6 +242,7 @@ Current flow:
 4. Define lazy dataset-tab helpers and patch-notes builders.
 5. Inject CSS, theme/nav/SVG JS, and clipboard helpers.
 6. Build the header, home page, hidden patch-notes tab, interactive-data tabs, and lazy `uiOutput(...)` placeholders for `sc3` to `sc7`.
+7. Register secondary pages as tabs even when hidden from the primary navbar, so embedded mini nav links and URL hashes can still select them.
 
 Important consequence:
 - The UI no longer eagerly reads `sc3` to `sc7` config/default assets.
@@ -348,6 +360,7 @@ Source path:
 
 Behavior:
 - hidden `patch_notes` tab is linked from the header
+- patch-notes navbar anchor and parent item are hidden to avoid a blank navbar gap while preserving the route
 - theme is stored in browser `localStorage`
 - share links are generated from bookmark state and copied to clipboard
 
@@ -445,7 +458,6 @@ Status:
 - confirmed
 
 Examples:
-- `make_interactive_explanation_box()` contains filler explanation text
 - the extended tutorial modal currently says `"Tutorial in progress"`
 
 ### 8. Metadata override precedence is still easy to misunderstand
@@ -497,6 +509,12 @@ Use these names first when re-entering the codebase:
   - `theme_mode`
   - `doBookmark`
   - `copy-to-clipboard`
+- navigation:
+  - `make_cell_subsets_menu(`
+  - `make_interactive_data_nav(`
+  - `build_dataset_secondary_nav(`
+  - `window.navToTab`
+  - `#mainTabs > li:has(`
 - performance profiling:
   - `sperminteractive.profile_lag`
   - `SPERMINTERACTIVE_PROFILE_LAG`
@@ -518,6 +536,7 @@ The most important current facts are:
 - staged/subset dataset families are lazy-rendered and bound on first visit
 - the home route is materially lighter after the March 23 refactor and March 24 rebaseline
 - release notes, patch notes, theme state, and shareable links are now part of the live app surface
+- Full Atlas, Interactive Data, and Cell Subsets now use primary navbar entries for section entry points and embedded mini nav bars for secondary pages; hidden registered tabs are intentional
 - the spermatogenesis table threshold is now user-editable and shared between the SVG overlay and the modal gene table
 - the biggest remaining technical risks are:
   - shinyapps warm-load asset duplication

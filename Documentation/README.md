@@ -1,7 +1,7 @@
 # SpermInteractive (README IS WIP)
 Welcome to SpermInteractive. This database lets you generate editable figures based primarily on:
 
-- Hayden McSwiggin, *Single Nuclei Analysis of Staged Seminifierous Tubules* (Unpublished, expected mid 2026)
+- Hayden McSwiggin, *Single Nuclei Analysis of Staged Seminiferous Tubules* (Unpublished, expected mid 2026)
 
 You can also build custom figures from the Seurat-derived datasets used in this project. Figure outputs can be downloaded as PNG or PDF.
 
@@ -17,9 +17,13 @@ You can also build custom figures from the Seurat-derived datasets used in this 
 - Each icon redirects to a corresponding main figure or interactive view.
 
 ### 2. Navigate with the top menu
-- **Staged Testis**: Primary full dataset used across the project.
-- **Subset tabs**: Same figure workflows as Staged Testis, but restricted to subset-specific cells.
-- **Interactive Data**: Custom interactive views (including the spermatogenesis table, RA analysis, and cell-cell communication heatmap).
+- **Full Atlas**: Primary full dataset used across the project. The top menu opens its Main Figures page; the other Full Atlas figure pages are reached from the embedded mini navigation bar inside the page.
+- **Cell Subsets**: Top-level dropdown for Sertoli, Spermatogonia, Spermatocyte, and Spermatid subsets. Each dropdown item opens that subset's Main Figures page; other subset figure pages are reached from the embedded mini navigation bar inside the page.
+- **Interactive Data**: Custom interactive views, including the spermatogenesis table, RA analysis, and cell-cell communication heatmap. The top menu opens the spermatogenesis table; the other interactive views are reached from the embedded mini navigation bar.
+
+Navigation implementation note:
+- Some tabs are intentionally registered in `ui.R` but hidden from the primary navbar with CSS so `window.navToTab(...)`, URL hashes, and lazy `mainTabs` routing still work.
+- The dataset mini navigation is built in `ra_tabs.R`; the interactive-data mini navigation is built in `ui.R`.
 
 ### 3. Use any figure tab
 - Most tabs follow the same layout:
