@@ -1,18 +1,17 @@
-# Currently, we host on Shinyapps.io:
-This comes with limits however, mainly:
-    - 25 hours a month. Presumabley this means we only have 25 hours of the shinyapp being actually used EACH MONTH. not good.
-    - 1 gb of max memory per app.
-    - 1 worker per instance, whatever that means.
-    - 1 gb deployment bundle size.
-    - increasing memory size and hours per month will be 50$/month. Atrocious.
+# Hosting Planning
 
-# Possible alternatives:
-    - Absolute best would be self hosting for free on a linux PC we keep running 24/7, with automated website refreshes whenever the PC restarts. This however will be tough with IT. an will therefore be connected to WSU, as it uses their network
+The app is currently hosted on shinyapps.io. The current plan has practical limits that matter for review and production readiness:
 
-    - Google cloud services could (I think) let us solve the isse of the linux server being at WSU, as from what I understand it lets us essentially pay for a virtual server that they keep, we just use. However, not free.
+- 25 active hours per month.
+- 1 GB maximum memory per app.
+- 1 worker per instance; confirm exact concurrency behavior before changing production capacity.
+- 1 GB deployment bundle size.
+- Higher memory and usage limits require a paid plan.
 
-    - Digital Ocean ive heard good things about, could look into it
+## Alternatives
 
-    - ShinyServer or ShinyProxy? EXPSENSIVE
-
-    - we also have a server we can access, that is our personal device but is on the wsu network. 
+- **Self-hosted Linux workstation**: lowest direct hosting cost, but requires a machine running continuously, restart automation, network routing, and coordination with institutional IT.
+- **Institutional server**: available hardware may be usable, but network access, uptime, and administration responsibilities need confirmation.
+- **Google Cloud**: removes dependence on a local campus machine, but adds infrastructure cost and maintenance.
+- **DigitalOcean**: practical VPS option to evaluate for cost, deployment complexity, and memory requirements.
+- **Shiny Server or ShinyProxy**: viable for production-style hosting, but cost and administration overhead need review.

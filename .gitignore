@@ -13,6 +13,29 @@
 *.loom
 *.qs
 
+# Runtime/generated app data lives in Data/. Keep the small runtime CellChat CSV
+# committable, but leave generated RDS/HDF5 assets and raw Seurat objects local.
+ShinyApp/shinyApp/Data/*.rds
+ShinyApp/shinyApp/Data/*.RDS
+ShinyApp/shinyApp/Data/*.h5
+ShinyApp/shinyApp/Data/*.h5ad
+ShinyApp/shinyApp/Data/*.h5seurat
+ShinyApp/shinyApp/Data/*.loom
+ShinyApp/shinyApp/Data/*.qs
+ShinyApp/shinyApp/Data/*.RData
+!ShinyApp/shinyApp/Data/CellChat_all_stage_communication_score_LR_reverse.csv
+
+# Legacy app-root data locations retained as ignore rules so regenerated assets
+# are not accidentally committed outside Data/.
+ShinyApp/shinyApp/*.rds
+ShinyApp/shinyApp/*.RDS
+ShinyApp/shinyApp/*.h5
+ShinyApp/shinyApp/*.h5ad
+ShinyApp/shinyApp/*.h5seurat
+ShinyApp/shinyApp/*.loom
+ShinyApp/shinyApp/*.qs
+ShinyApp/shinyApp/*.RData
+
 # Local / temp files
 tmp/
 tmp
@@ -27,10 +50,10 @@ ShinyApp/shinyApp/backupFiles/
 ShinyApp/shinyApp/www/*.har
 ShinyApp/shinyApp/www/*.json.gz
 ShinyApp/shinyApp/www/* profile.json/
-ShinyApp/shinyApp/archive/network_profiles/*.har
-ShinyApp/shinyApp/archive/network_profiles/*.json
-ShinyApp/shinyApp/archive/network_profiles/*.json.gz
-ShinyApp/shinyApp/archive/network_profiles/* profile.json/
+ShinyApp/shinyApp/www/archive/network_profiles/*.har
+ShinyApp/shinyApp/www/archive/network_profiles/*.json
+ShinyApp/shinyApp/www/archive/network_profiles/*.json.gz
+ShinyApp/shinyApp/www/archive/network_profiles/* profile.json/
 
 # Secrets (never commit)
 .Renviron
@@ -46,3 +69,10 @@ Thumbs.db
 .codex
 *:Zone.Identifier
 ShinyApp/shinyApp/all_figures.pdf
+
+# Generated reference outputs
+ShinyApp/shinyApp/www/dotplot_RA_specificCellID.pdf
+ShinyApp/shinyApp/www/figure7_C_RA_across_stages.pdf
+
+# Additional files
+ShinyApp/shinyApp/www/archive/reference/all_figures.pdf

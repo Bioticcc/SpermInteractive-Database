@@ -3,6 +3,9 @@
 This directory is for browser performance/reference captures that are useful for
 analysis but are not part of the runtime app surface.
 
+- The directory lives under `www/archive/` only to keep non-runtime static
+  artifacts together. `www/archive/` is excluded from deployment by
+  `.rscignore`.
 - Firefox performance profile JSON and extracted profile folders stored here are
   reference-only.
 - HAR or Firefox Network Monitor exports stored here are the authoritative input

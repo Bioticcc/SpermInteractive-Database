@@ -10,42 +10,35 @@ It summarizes:
 - the current operational and deployment surfaces
 - the main remaining risks
 
-Current snapshot date: `2026-06-02`
+Current snapshot date: `2026-07-05`
 
 ## Environment Snapshot
-- Repo root: `/home/biotic/ShinyApp Project`
+- Repo root: `/home/jeezu/ShinyApp Project`
 - Active app directory: `ShinyApp/shinyApp`
 - Local launch/deploy helper: `ShinyApp/global.R`
 - Primary runtime entrypoints:
   - `ShinyApp/shinyApp/ui.R`
   - `ShinyApp/shinyApp/server.R`
-  - `ShinyApp/shinyApp/ra_tabs.R`
+  - `ShinyApp/shinyApp/dataset_tab_builders.R`
   - `ShinyApp/shinyApp/app_support.R`
   - `ShinyApp/shinyApp/metadata_overrides.R`
 - Environment pinning:
   - `renv.lock` pins R `4.3.3` and the app package set
   - `Dockerfile` builds from `rocker/shiny:4.3.3` and restores with `renv`
+- Style tooling:
+  - R source is formatted with `styler` and checked with targeted `lintr` rules for explicit returns, left assignment, and no `attach()` usage
+  - CSS source is checked with `stylelint.config.cjs` and `stylelint-config-standard`
 - Deployment/bundle filtering:
-  - `ShinyApp/shinyApp/.rscignore` excludes raw Seurat objects, `archive/`, local rsconnect metadata, and stray network/profile artifacts
+  - `ShinyApp/shinyApp/.rscignore` excludes raw Seurat objects, `archive/`, `www/archive/`, local rsconnect metadata, and stray network/profile artifacts
   - `.dockerignore` excludes large local artifacts from container builds
 
 ## Documentation Layout
-- `Documentation/README.md`
-  - longer-form project guide
+- Root `README.md`
+  - single project README and longer-form project guide
 - `Documentation/AI_HANDOFF_SUMMARY.md`
   - this handoff
 - `Documentation/REPO_FILE_CLASSIFICATION.md`
   - runtime vs build vs reference vs archive notes
-- `Documentation/NETWORK_BASELINE_RESET.md`
-  - HAR capture protocol
-- `Documentation/NETWORK_PERFORMANCE_REPORT.md`
-  - current `#home` network findings and post-refactor rebaseline
-- Root `README.md`
-  - lightweight entrypoint into `Documentation/`
-
-Important note:
-- Some older docs still refer to a root-level `NETWORK_PERFORMANCE_REPORT.md`.
-- The current tracked file is `Documentation/NETWORK_PERFORMANCE_REPORT.md`.
 
 ## What Changed Since The 2026-03-23 Snapshot
 
@@ -56,8 +49,8 @@ Important note:
 - After first render, outputs return to `suspendWhenHidden = TRUE`.
 
 ### 2. The `#home` refactor was rebaselined
-- The authoritative report is now `Documentation/NETWORK_PERFORMANCE_REPORT.md`.
-- Post-refactor medians from the `2026-03-24` report:
+- The authoritative networking notes now live in the `Networking` section of this file.
+- Post-refactor medians from the `2026-03-24` HAR rebaseline:
   - cold: `89` requests, `1.2 MB`, `368 ms` document TTFB
   - warm: `62` requests, `757.5 KB`, `346 ms` document TTFB
 - Initial `#home` no longer bootstraps staged/subset `dataobj/sc*` requests.
@@ -103,7 +96,7 @@ Important note:
 ## Current High-Level Architecture
 
 ### 1. Lazy ShinyCell dataset plane for `sc3` to `sc7`
-Per dataset prefix, runtime uses:
+Per dataset prefix, runtime uses files under `ShinyApp/shinyApp/Data/`:
 - `scNconf.rds`
 - `scNdef.rds`
 - `scNgene.rds`
@@ -117,7 +110,7 @@ These drive:
 - stage-split views inside the generic dataset binder
 
 ### 2. Precomputed interactive-data plane
-These include:
+These include files under `ShinyApp/shinyApp/Data/`:
 - `interactive_genes.rds`
 - `spg_avg_expr_by_button.rds`
 - `ra_dot_avg_expr.rds`
@@ -172,7 +165,7 @@ The following remain custom runtime paths outside the generic ShinyCell dataset 
 - `ShinyApp/shinyApp/server.R`
   - main runtime logic
   - owns plotting helpers, lazy active bindings, first-open dataset initialization, interactive-data logic, bookmarking/share-link handling, and lag profiling
-- `ShinyApp/shinyApp/ra_tabs.R`
+- `ShinyApp/shinyApp/dataset_tab_builders.R`
   - shared UI builders for main figures, detailed dataset tabs, and the embedded dataset mini navigation
 - `ShinyApp/shinyApp/app_support.R`
   - shared runtime support layer for path discovery, loaders, spinners, and gene-index normalization
@@ -190,7 +183,7 @@ The following remain custom runtime paths outside the generic ShinyCell dataset 
   - fallback metadata override file when CSV is absent
 - `ShinyApp/shinyApp/www/mouseGeneMapping.txt`
   - Ensembl lookup table used by spermatogenesis modal results
-- `ShinyApp/shinyApp/CellChat_all_stage_communication_score_LR_reverse.csv`
+- `ShinyApp/shinyApp/Data/CellChat_all_stage_communication_score_LR_reverse.csv`
   - CellChat heatmap source
 
 ### Build and utility scripts
@@ -198,19 +191,19 @@ The following remain custom runtime paths outside the generic ShinyCell dataset 
   - local bootstrap helper
   - release-note sync helper
   - currently also contains an active shinyapps deployment call
-- `ShinyApp/shinyApp/build_shinycell_assets.R`
+- `ShinyApp/shinyApp/scripts/build/build_shinycell_assets.R`
   - builds ShinyCell assets for `sc3` to `sc7`
-- `ShinyApp/shinyApp/build_interactive_assets.R`
+- `ShinyApp/shinyApp/scripts/build/build_interactive_assets.R`
   - builds RA and spermatogenesis interactive assets from Seurat objects
-- `ShinyApp/shinyApp/generate_home_previews.R`
-  - generates runtime home previews in `www/` and archival reference previews in `archive/reference_www/`
-- `ShinyApp/shinyApp/patch_subset_specificCellID1_assets.R`
+- `ShinyApp/shinyApp/scripts/build/generate_home_previews.R`
+  - generates runtime home previews in `www/` and archival reference previews in `www/archive/reference/`
+- `ShinyApp/shinyApp/scripts/maintenance/patch_subset_specificCellID1_assets.R`
   - patches subset ShinyCell metadata/config using staged-testis master metadata
-- `ShinyApp/shinyApp/bench_memory_usage.R`
+- `ShinyApp/shinyApp/scripts/benchmarks/bench_memory_usage.R`
   - measures app asset memory footprint
-- `ShinyApp/shinyApp/bench_network_har.R`
+- `ShinyApp/shinyApp/scripts/benchmarks/bench_network_har.R`
   - summarizes HAR exports for network baseline work
-- `ShinyApp/shinyApp/data_loaders.R`
+- `ShinyApp/shinyApp/scripts/support/data_loaders.R`
   - helper script for loading assets outside the runtime server path
 - `Dockerfile`
   - container entrypoint for running the deployed app surface from `ShinyApp/shinyApp`
@@ -222,11 +215,13 @@ The following remain custom runtime paths outside the generic ShinyCell dataset 
 ### Reference and archive material
 - `Documentation/`
   - current docs
-- `ShinyApp/shinyApp/archive/reference_www/`
-  - former `www/` assets no longer used at runtime
-- `ShinyApp/shinyApp/archive/network_profiles/`
+- `ShinyApp/shinyApp/www/archive/reference/`
+  - former `www/` assets, generated PDFs, and reference images no longer used at runtime
+- `ShinyApp/shinyApp/www/archive/network_profiles/`
   - HAR/profile captures and archive README
-- `ShinyApp/shinyApp/RA_Signaling_Figure5 (1).R`
+- `ShinyApp/shinyApp/www/archive/`
+  - reference-only static archive excluded from deployment through `.rscignore`
+- `ShinyApp/shinyApp/scripts/references/ra_signaling_figure5_reference.R`
   - reference publication script, not live runtime logic
 
 ## Startup And Runtime Dataflow
@@ -273,7 +268,7 @@ Important consequence:
 
 ### 1. Main Figure pages for `sc3` to `sc7`
 Source path:
-- UI from `ra_tabs.R`
+- UI from `dataset_tab_builders.R`
 - server binding from `bind_main_figures()` in `server.R`
 
 Behavior:
@@ -284,7 +279,7 @@ Behavior:
 
 ### 2. Detailed staged/subset tabs for `sc3` to `sc7`
 Source path:
-- UI from `ra_tabs.R`
+- UI from `dataset_tab_builders.R`
 - server binding from `bind_shinycell_dataset()` in `server.R`
 
 Behavior:
@@ -308,7 +303,7 @@ Source path:
 - `server.R`
 - `button_mapping_general.R`
 - `www/mouseGeneMapping.txt`
-- `spg_avg_expr_by_button.rds`
+- `Data/spg_avg_expr_by_button.rds`
 
 Behavior:
 - renders a generated SVG click surface over `interactiveTable.png`
@@ -321,8 +316,8 @@ Behavior:
 
 ### 4. RA dotplot
 Source path:
-- `ra_dot_avg_expr.rds`
-- `ra_dot_pct_expr.rds`
+- `Data/ra_dot_avg_expr.rds`
+- `Data/ra_dot_pct_expr.rds`
 - `make_fig5A()` in `server.R`
 
 Behavior:
@@ -332,7 +327,7 @@ Behavior:
 
 ### 5. RA lineplot
 Source path:
-- `ra_line_mean_expr.rds`
+- `Data/ra_line_mean_expr.rds`
 - `make_fig5C()` in `server.R`
 
 Behavior:
@@ -343,7 +338,7 @@ Behavior:
 
 ### 6. Cell-cell communication heatmap
 Source path:
-- `CellChat_all_stage_communication_score_LR_reverse.csv`
+- `Data/CellChat_all_stage_communication_score_LR_reverse.csv`
 - interactive plotly path plus `make_fig6D_static()` for PDF export
 
 Behavior:
@@ -364,19 +359,69 @@ Behavior:
 - theme is stored in browser `localStorage`
 - share links are generated from bookmark state and copied to clipboard
 
+## Networking
+
+This section is the canonical networking handoff. The former standalone network
+baseline and performance markdown files were folded here so future agents do
+not need to reconcile multiple network-status documents.
+
+### Scope
+- Published route tested: `https://ward-bio.shinyapps.io/SpermInteractive/#home`
+- Baseline HARs live under `ShinyApp/shinyApp/www/archive/network_profiles/`.
+- HAR summaries are generated with `ShinyApp/shinyApp/scripts/benchmarks/bench_network_har.R`.
+- Firefox performance profile JSON is directional only. Use Firefox Network Monitor export or HAR for authoritative request counts, transferred bytes, cache behavior, TTFB, and waterfall order.
+
+### Capture Protocol
+- Capture cold loads with cache disabled and warm reloads with cache enabled.
+- Run each scenario three times and compare medians.
+- Do not click other tabs during capture.
+- Stop capture only after the page is visually idle and network activity is quiet.
+- Name files with `cold` or `warm`, for example `home_cold_1.har`, so the benchmark script can group repeated runs automatically.
+
+Run from the repo root:
+
+```bash
+Rscript ShinyApp/shinyApp/scripts/benchmarks/bench_network_har.R \
+  path/to/home_cold_1.har \
+  path/to/home_cold_2.har \
+  path/to/home_cold_3.har \
+  path/to/home_warm_1.har \
+  path/to/home_warm_2.har \
+  path/to/home_warm_3.har
+```
+
+### Current `#home` Rebaseline
+- Date: `2026-03-24`
+- Cold median improved from `101` requests, `1.9 MB`, and `2609 ms` document TTFB to `89` requests, `1.2 MB`, and `368 ms` document TTFB.
+- Warm median changed from `80` requests, `593.7 KB`, and `2579 ms` document TTFB to `62` requests, `757.5 KB`, and `346 ms` document TTFB.
+- Cold transferred bytes dropped by about `37%`, beating the first-pass `25%` target.
+- Initial `#home` no longer makes `session/.../dataobj/sc[3-7]` requests.
+- The first major SockJS init payload dropped from roughly `36225` bytes to roughly `4780` bytes.
+- Delivered HTML dropped from roughly `896696` bytes uncompressed and `53559` bytes compressed to roughly `74875` bytes uncompressed and `13285` bytes compressed.
+
+### Current Findings
+- The lazy-tab refactor made `#home` a much lighter entry route by moving staged/subset dataset initialization off the initial home load.
+- Runtime preview images fixed the cold image payload. Home should request `interactiveTable_preview.png`, `ra_preview_publication_icon.png`, `ccc_heatmap_preview.png`, and `logo.png`; the full-size `interactiveTable.png` should appear only when the live spermatogenesis SVG/table page is opened.
+- Current runtime preview sizes from the `2026-03-24` HAR rebaseline were:
+  - `interactiveTable_preview.png`: `518x280`, about `83 KB`
+  - `ra_preview_publication_icon.png`: `482x280`, about `51 KB`
+  - `ccc_heatmap_preview.png`: `445x280`, about `27 KB`
+- Production heatmap debug is query-param gated instead of shipping debug mode by default.
+- CSS caching was not the main startup bottleneck in the HARs. Revisit `css/style.css` import chaining only if future HARs show CSS blocking time matters.
+
+### Remaining Networking Issue
+- Warm loads still waste bytes because shinyapps.io sometimes loads duplicated static assets under mixed worker-prefixed URL forms.
+- The duplicated assets observed in the `2026-03-24` rebaseline included core JS/CSS and `logo.png`.
+- This looks like a worker-path URL resolution mismatch rather than a return of staged/subset eager bootstrap.
+- Next networking pass: normalize app-controlled asset URL generation first, then re-run warm `#home` HARs to determine whether remaining duplication is hosting-layer behavior.
+
+### Networking Acceptance Targets
+- Keep staged/subset `dataobj/sc*` requests absent from initial `#home`.
+- Keep the home route on preview-sized image assets, not full-size interactive backgrounds.
+- Keep the initial SockJS/init payload from enumerating the full hidden `sc3` to `sc7` output tree.
+- Reduce median current-site home interactive time materially; the initial target was under 10 seconds, then reassess.
+
 ## Current Performance Model
-
-### Home-route network/startup
-Authoritative status:
-- `Documentation/NETWORK_PERFORMANCE_REPORT.md`
-
-Current post-refactor state:
-- cold startup improved substantially versus the pre-refactor March 23 baseline
-- initial `#home` no longer bootstraps staged/subset `dataobj/sc*` requests
-- cold transfer target was met
-
-Remaining issue:
-- warm loads still waste bytes on duplicated static assets under mixed worker-prefixed URLs on shinyapps.io
 
 ### HDF5-backed tab interaction lag
 Still the leading cause of dataset-tab slowness.
@@ -399,7 +444,7 @@ Current measurement method:
 
 ### Memory/deployment posture
 - Interactive figures use precomputed assets specifically to avoid loading full Seurat objects on shinyapps.io.
-- Runtime still depends on generated `sc3*` to `sc7*` and interactive `.rds`/`.h5` assets that are not committed to git.
+- Runtime still depends on generated `Data/sc3*` to `Data/sc7*` and interactive `.rds`/`.h5` assets that are not committed to git.
 - `options(shiny.maxRequestSize = 5 * 1024^3)` is set, but the upload-dataset feature is currently commented out and not part of the live UI path.
 
 ## Known Issues, Risks, And Open Questions
@@ -413,20 +458,22 @@ Why it matters:
 - it also retains an active `rsconnect::deployApp(...)` path
 - this is easy to trigger accidentally when treating it as a simple local helper
 
-### 2. Documentation path drift is reduced, but archive references may still exist
+### 2. Network guidance is consolidated in this handoff
 Status:
-- primary entry docs fixed
+- confirmed
 
 Why it matters:
-- the canonical network report path is `Documentation/NETWORK_PERFORMANCE_REPORT.md`
-- future doc updates should preserve `Documentation/` as the source of truth
+- the former standalone network baseline and performance markdown files were
+  folded into the `Networking` section above
+- future networking updates should revise this handoff and the HAR archives,
+  not recreate parallel status files
 
 ### 3. Asset provenance and assay policy still need explicit documentation
 Status:
 - still an active architecture risk
 
 Why it matters:
-- `build_interactive_assets.R` and `build_shinycell_assets.R` can read different preferred assays
+- `scripts/build/build_interactive_assets.R` and `scripts/build/build_shinycell_assets.R` can read different preferred assays
 - figure differences may be pipeline-driven rather than biologically intended
 
 ### 4. Runtime depends on generated assets that are not in git
@@ -435,11 +482,11 @@ Status:
 
 Why it matters:
 - a clean clone is not enough to run the app
-- missing `sc3*` to `sc7*` or interactive asset files will break runtime paths even if the source repo looks complete
+- missing `Data/sc3*` to `Data/sc7*` or interactive asset files will break runtime paths even if the source repo looks complete
 
 ### 5. Warm-load shinyapps asset duplication remains unresolved
 Status:
-- confirmed by the `2026-03-24` network report
+- confirmed by the `2026-03-24` HAR rebaseline in the `Networking` section
 
 Why it matters:
 - this is now the main remaining network inefficiency on `#home`
@@ -453,12 +500,13 @@ Why it matters:
 - `ui.R` keeps `upload.js` commented out
 - future agents should not assume those paths are active
 
-### 7. Some UI content is still placeholder content
+### 7. Style tooling is config-based, not vendored
 Status:
 - confirmed
 
-Examples:
-- the extended tutorial modal currently says `"Tutorial in progress"`
+Why it matters:
+- `stylelint.config.cjs` is tracked, but Node dependencies are not vendored.
+- Run Stylelint from a local or temporary install that includes `stylelint` and `stylelint-config-standard`.
 
 ### 8. Metadata override precedence is still easy to misunderstand
 Status:
@@ -491,8 +539,7 @@ Why it matters:
 3. Create an asset provenance note/table covering source object, assay, build script, and output files.
 4. Use `[lag_profile]` output to target the slowest HDF5-backed dataset tabs before optimizing blindly.
 5. Clean or remove the dormant upload-dataset path if it is not coming back soon.
-6. Replace placeholder explanation/tutorial content with real project guidance.
-7. Audit missing-gene reports against the upstream Seurat objects and build outputs, starting with `Prssly` and `Teyorf1`.
+6. Audit missing-gene reports against the upstream Seurat objects and build outputs, starting with `Prssly` and `Teyorf1`.
 
 ## Practical Search Anchors
 Use these names first when re-entering the codebase:

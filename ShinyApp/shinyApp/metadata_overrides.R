@@ -1,14 +1,30 @@
+# ---------------------------------------------------------------------------
+# Metadata override helpers
+# ---------------------------------------------------------------------------
+# This module reads curator-maintained metadata rename/remove rules and applies
+# them to ShinyCell configuration/default objects before dataset tabs render.
+# It is sourced by server.R before any lazy ShinyCell asset is materialized.
+
+# ---------------------------------------------------------------------------
+# Small local helpers
+# ---------------------------------------------------------------------------
 `%||%` <- function(lhs, rhs) {
   if (is.null(lhs) || length(lhs) == 0) {
     return(rhs)
   }
-  lhs
+  return(lhs)
 }
 
 trim_chr <- function(x) {
-  trimws(as.character(x))
+  return(trimws(as.character(x)))
 }
 
+# ---------------------------------------------------------------------------
+# Metadata rule readers
+# ---------------------------------------------------------------------------
+# Read the first two columns of a simple XLSX file without introducing an Excel
+# package dependency into the app runtime. The XML parser only needs shared
+# strings and sheet1 because metadata.xlsx is a two-column override table.
 read_metadata_xlsx <- function(path) {
   tmp_dir <- tempfile("metadata_xlsx_")
   dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
@@ -27,7 +43,7 @@ read_metadata_xlsx <- function(path) {
     shared_strings <- vapply(
       si_nodes,
       function(node) {
-        paste(xml2::xml_text(xml2::xml_find_all(node, ".//d1:t", ns = ns)), collapse = "")
+        return(paste(xml2::xml_text(xml2::xml_find_all(node, ".//d1:t", ns = ns)), collapse = ""))
       },
       character(1)
     )
@@ -48,7 +64,7 @@ read_metadata_xlsx <- function(path) {
     for (ch in chars) {
       total <- total * 26L + (match(ch, LETTERS) - 1L + 1L)
     }
-    total
+    return(total)
   }
   if (!length(all_cols)) {
     return(data.frame(old = character(0), new = character(0), stringsAsFactors = FALSE))
@@ -99,9 +115,11 @@ read_metadata_xlsx <- function(path) {
     new_vals <- c(new_vals, row_vals[2])
   }
 
-  data.frame(old = old_vals, new = new_vals, stringsAsFactors = FALSE)
+  return(data.frame(old = old_vals, new = new_vals, stringsAsFactors = FALSE))
 }
 
+# Normalize any two-column override source into old/new rows. Blank replacement
+# values are kept as NA, and duplicate old keys keep the last curator entry.
 normalize_metadata_rules <- function(raw_df) {
   if (is.null(raw_df) || nrow(raw_df) == 0 || ncol(raw_df) < 2) {
     return(data.frame(old = character(0), new = character(0), stringsAsFactors = FALSE))
@@ -121,9 +139,11 @@ normalize_metadata_rules <- function(raw_df) {
   key <- tolower(rules$old)
   rules <- rules[!duplicated(key, fromLast = TRUE), , drop = FALSE]
   rownames(rules) <- NULL
-  rules
+  return(rules)
 }
 
+# Prefer metadata.csv for deployment reproducibility, while keeping metadata.xlsx
+# as a local fallback for manual editing workflows.
 read_metadata_rules <- function(base_dir = "www") {
   csv_path <- file.path(base_dir, "metadata.csv")
   xlsx_path <- file.path(base_dir, "metadata.xlsx")
@@ -139,24 +159,31 @@ read_metadata_rules <- function(base_dir = "www") {
       read_metadata_xlsx(xlsx_path),
       error = function(e) {
         warning(sprintf("Unable to read metadata overrides from '%s': %s", xlsx_path, e$message))
-        NULL
+        return(NULL)
       }
     )
   }
 
-  normalize_metadata_rules(raw_df)
+  return(normalize_metadata_rules(raw_df))
 }
 
+# Cache override rules for the lifetime of the R process. Use force = TRUE only
+# for development reloads where the metadata file changed on disk.
 get_metadata_overrides <- local({
   cache <- NULL
   function(force = FALSE, base_dir = "www") {
     if (isTRUE(force) || is.null(cache)) {
       cache <<- read_metadata_rules(base_dir = base_dir)
     }
-    cache
+    return(cache)
   }
 })
 
+# ---------------------------------------------------------------------------
+# Override lookup and application
+# ---------------------------------------------------------------------------
+# Match exact IDs plus simple singular/plural and numeric-suffix variants so the
+# same override sheet can cover ShinyCell naming differences across datasets.
 lookup_metadata_override <- function(id, rules) {
   if (is.null(id) || is.na(id) || !nzchar(id) || is.null(rules) || nrow(rules) == 0) {
     return(NA_character_)
@@ -181,9 +208,11 @@ lookup_metadata_override <- function(id, rules) {
     }
   }
 
-  NA_character_
+  return(NA_character_)
 }
 
+# Apply display-name and remove rules to the ShinyCell configuration table while
+# leaving dimension-reduction rows untouched.
 apply_metadata_overrides_to_conf <- function(conf, rules = NULL) {
   if (is.null(rules)) {
     rules <- get_metadata_overrides()
@@ -224,9 +253,10 @@ apply_metadata_overrides_to_conf <- function(conf, rules = NULL) {
     }
   }
 
-  conf
+  return(conf)
 }
 
+# Return displayable metadata labels from a ShinyCell configuration table.
 get_cellinfo_choices <- function(conf, grouped_only = FALSE, include_dimred = FALSE) {
   if (is.null(conf) || nrow(conf) == 0 || !"UI" %in% names(conf)) {
     return(character(0))
@@ -240,9 +270,11 @@ get_cellinfo_choices <- function(conf, grouped_only = FALSE, include_dimred = FA
     mask <- mask & !is.na(conf$grp) & conf$grp
   }
 
-  unique(as.character(conf$UI[mask]))
+  return(unique(as.character(conf$UI[mask])))
 }
 
+# Resolve preferred internal IDs to display labels. This keeps tab builders
+# stable when config files use singular/plural variants of the same concept.
 resolve_ui_from_id <- function(conf, preferred_ids, fallback = NULL) {
   if (is.null(conf) || nrow(conf) == 0 || !"ID" %in% names(conf) || !"UI" %in% names(conf)) {
     return(fallback %||% "")
@@ -266,9 +298,11 @@ resolve_ui_from_id <- function(conf, preferred_ids, fallback = NULL) {
     return(grouped[[1]])
   }
 
-  fallback %||% ""
+  return(fallback %||% "")
 }
 
+# Apply override rules to default selections and then clamp those defaults to
+# currently valid grouped metadata choices.
 apply_metadata_overrides_to_def <- function(def, conf, rules = NULL) {
   if (is.null(def) || !is.list(def)) {
     return(def)
@@ -293,7 +327,7 @@ apply_metadata_overrides_to_def <- function(def, conf, rules = NULL) {
     if (tolower(override) == "remove") {
       return(NA_character_)
     }
-    override
+    return(override)
   }
 
   for (field in c("meta1", "meta2", "grp1", "grp2")) {
@@ -311,7 +345,7 @@ apply_metadata_overrides_to_def <- function(def, conf, rules = NULL) {
     if (!is.na(current) && nzchar(current) && current %in% choices) {
       return(current)
     }
-    choices[[1]]
+    return(choices[[1]])
   }
 
   for (field in c("meta1", "meta2", "grp1", "grp2")) {
@@ -320,5 +354,5 @@ apply_metadata_overrides_to_def <- function(def, conf, rules = NULL) {
     }
   }
 
-  def
+  return(def)
 }

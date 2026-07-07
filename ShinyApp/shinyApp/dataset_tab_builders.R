@@ -1,10 +1,23 @@
+# ---------------------------------------------------------------------------
+# Dataset tab UI builders
+# ---------------------------------------------------------------------------
+# This file builds the reusable ShinyCell dataset tab bodies for sc3-sc7. The
+# functions emit UI only; server.R owns the matching output renderers and input
+# observers. Keep ID prefixes and block names aligned with bind_shinycell_dataset
+# and bind_main_figures in server.R.
+
+# ---------------------------------------------------------------------------
+# Low-level card and form helpers
+# ---------------------------------------------------------------------------
+# These wrappers keep the repeated legacy/ShinyCell controls visually consistent
+# without changing the underlying Shiny input/output IDs.
 ra_card_head <- function(title = NULL, subtitle = NULL, ...) {
   if (is.null(title)) {
     return(NULL)
   }
   extras <- Filter(Negate(is.null), list(...))
   head_children <- c(list(tags$h3(class = "ra-title", title)), extras)
-  tags$div(
+  return(tags$div(
     class = "ra-card-head",
     do.call(
       tags$div,
@@ -15,11 +28,11 @@ ra_card_head <- function(title = NULL, subtitle = NULL, ...) {
     } else {
       NULL
     }
-  )
+  ))
 }
 
 ra_rowgroup <- function(title = NULL, ...) {
-  tags$div(
+  return(tags$div(
     class = "ra-rowgroup",
     if (!is.null(title)) {
       tags$div(class = "ra-rowtitle", title)
@@ -27,11 +40,11 @@ ra_rowgroup <- function(title = NULL, ...) {
       NULL
     },
     ...
-  )
+  ))
 }
 
 ra_field <- function(label = NULL, input) {
-  tags$div(
+  return(tags$div(
     class = "ra-field",
     if (!is.null(label)) {
       tags$label(class = "ra-label", label)
@@ -39,7 +52,7 @@ ra_field <- function(label = NULL, input) {
       NULL
     },
     input
-  )
+  ))
 }
 
 ra_download_row <- function(pdf_id,
@@ -54,7 +67,7 @@ ra_download_row <- function(pdf_id,
                             height_max = 20,
                             width_min = 4,
                             width_max = 20) {
-  tags$div(
+  return(tags$div(
     class = "ra-download-row",
     tags$div(
       class = "ra-download-buttons",
@@ -82,24 +95,24 @@ ra_download_row <- function(pdf_id,
         width = "148px"
       )
     )
-  )
+  ))
 }
 
 ra_download_buttons_only <- function(pdf_id, png_id) {
-  tags$div(
+  return(tags$div(
     class = "ra-download-row",
     tags$div(
       class = "ra-download-buttons",
       downloadButton(pdf_id, "Download PDF"),
       downloadButton(png_id, "Download PNG")
     )
-  )
+  ))
 }
 
 ra_download_filename_input <- function(filename_id,
                                        label = "Filename (optional)",
                                        placeholder = "Leave blank to use the default filename") {
-  tags$div(
+  return(tags$div(
     class = "ra-download-filename",
     textInput(
       inputId = filename_id,
@@ -108,7 +121,7 @@ ra_download_filename_input <- function(filename_id,
       placeholder = placeholder,
       width = "100%"
     )
-  )
+  ))
 }
 
 ra_download_entry <- function(pdf_id,
@@ -123,7 +136,7 @@ ra_download_entry <- function(pdf_id,
                               filename_placeholder = "Leave blank to use the default filename",
                               height_label = "PDF / PNG height:",
                               width_label = "PDF / PNG width:") {
-  tags$div(
+  return(tags$div(
     class = "ra-download-entry",
     if (!is.null(title)) {
       tags$div(class = "ra-download-entry-title", title)
@@ -149,28 +162,28 @@ ra_download_entry <- function(pdf_id,
       height_value = height_value,
       width_value = width_value
     )
-  )
+  ))
 }
 
 ra_download_modal_trigger <- function(button_id, label = "Download Figures") {
-  actionButton(
+  return(actionButton(
     inputId = button_id,
     label = label,
     class = "btn btn-outline-primary ra-download-modal-trigger"
-  )
+  ))
 }
 
 ra_download_modal_section <- function(button_id,
                                       title = "Figure downloads",
                                       label = "Download Figures") {
-  ra_rowgroup(
+  return(ra_rowgroup(
     title,
     ra_download_modal_trigger(button_id = button_id, label = label)
-  )
+  ))
 }
 
 ra_button_row <- function(...) {
-  tags$div(class = "ra-button-row", ...)
+  return(tags$div(class = "ra-button-row", ...))
 }
 
 ra_taglist <- function(...) {
@@ -179,9 +192,13 @@ ra_taglist <- function(...) {
   if (length(nodes) == 0) {
     return(NULL)
   }
-  do.call(tagList, nodes)
+  return(do.call(tagList, nodes))
 }
 
+# ---------------------------------------------------------------------------
+# Dataset navigation and defaults
+# ---------------------------------------------------------------------------
+# Pick a grouped metadata default that exists in the current dataset config.
 default_cell_type_choice <- function(conf, grouped_choices, fallback = NULL) {
   if (!length(grouped_choices)) {
     return("")
@@ -205,9 +222,11 @@ default_cell_type_choice <- function(conf, grouped_choices, fallback = NULL) {
     return(grouped_choices[1])
   }
 
-  choice
+  return(choice)
 }
 
+# The embedded mini-navigation mirrors the hidden top-level tab values registered
+# in ui.R and routed by window.navToTab(...).
 dataset_secondary_nav_specs <- list(
   list(title = "Main Figures", suffix = "main_figures"),
   list(title = "CellInfo vs GeneExpr", suffix = "cellinfo_gene"),
@@ -230,7 +249,7 @@ build_dataset_secondary_nav <- function(prefix, active_suffix) {
       classes <- c(classes, "is-active")
     }
 
-    tags$a(
+    return(tags$a(
       class = paste(classes, collapse = " "),
       href = paste0("#", tab_value),
       role = "button",
@@ -238,25 +257,26 @@ build_dataset_secondary_nav <- function(prefix, active_suffix) {
       `aria-current` = if (identical(nav_spec$suffix, active_suffix)) "page" else NULL,
       onclick = "return window.navToTab(this.getAttribute('data-target-tab'), this);",
       nav_spec$title
-    )
+    ))
   })
 
-  tags$nav(
+  return(tags$nav(
     class = "subset-secondary-nav",
     `aria-label` = "Subset page navigation",
     tags$div(class = "subset-secondary-nav-inner", links)
-  )
+  ))
 }
 
+# Long-form figure descriptions are kept with the tab builders because each
+# explanation is tied to the dataset-specific UI route.
 main_figures_explanation_text <- function(prefix) {
-  switch(
-    prefix,
-    sc3 = "The Full Atlas Main Figures tab presents the full single-nuclei dataset as two UMAP panels: an overview colored by annotated cell type, and the same embedding split by seminiferous tubule stage (I-XII) to reveal how populations shift across the spermatogenic cycle. Users can selectively highlight any combination of cell groups - from germ cell populations (Aund through El16) and stage-stratified Sertoli cells (SC_I-VIII through SC_All_Stages) to somatic populations (PTM, Leydig, Macrophage) - and adjust point size and cell labels before exporting publication-ready figures.",
-    sc4 = "The Sertoli Subset section provides a focused view of Sertoli cells isolated from the broader Full Atlas dataset. The Main Figures tab displays a UMAP colored by cell type (showing Sertoli stage subsets SC_I-VIII, SC_VII-VIII, SC_IX-XII, SC_XI-VI, and SC_All_Stages) alongside stage-split UMAP panels, revealing how Sertoli cell transcriptional states vary across the spermatogenic cycle. Additional views within this subset - including gene expression overlays, violin/boxplots, proportion plots, and bubble/heatmaps - allow deep exploration of Sertoli-specific gene programs, making this subset particularly useful for investigating how Sertoli cells support germ cell development in a stage-dependent manner.",
-    sc5 = "The Spermatogonia Subset focuses on the earliest germ cells in the spermatogenic lineage, capturing populations from undifferentiated spermatogonia (Aund) through the differentiating spermatogonial types (A1-2, A3-4, Ain, Type B) and into early preleptotene spermatocytes (ePL, lPL). The UMAP overview and stage-split panels highlight how these progenitor populations cluster and transition across tubule stages, while the full suite of interactive figure types (gene expression plots, pairwise comparisons, violin plots, proportion plots, and heatmaps) enables users to interrogate the molecular programs that distinguish self-renewing from differentiating spermatogonia, including responses to niche signals such as GDNF and KITL.",
-    sc6 = "The Spermatocyte Subset covers the meiotic phase of spermatogenesis, encompassing cells from leptotene through diplotene/MI (L, L/Z, Z, PaI-VI, PaVII-VIII, PaIX-X, D/MI). The UMAP for this subset reveals a distinctive arc-like or continuum structure reflecting the ordered progression through meiotic prophase I and beyond, with stage-split panels showing which meiotic substages predominate at each tubule stage (I-XII). The interactive tools available within this subset support exploration of meiosis-specific gene programs, including synaptonemal complex components, DNA repair machinery, and recombination-related transcripts, across both cell identity and stage dimensions.",
-    sc7 = "The Spermatid Subset encompasses the post-meiotic phase of spermatogenesis, covering round and elongating spermatid populations from Rd1 through El16. The UMAP for this subset reveals distinct clusters corresponding to progressive stages of spermiogenesis - including the dramatic morphological and transcriptional remodeling associated with acrosome formation, nuclear elongation, and flagellum assembly - with stage-split panels linking each population to its corresponding tubule stage context. The full set of interactive figure types available within this subset allows users to trace the expression dynamics of spermatid-specific genes across this extended differentiation continuum, making it a valuable resource for studying the transcriptional programs that underpin sperm head and tail development.",
-    NULL
+  switch(prefix,
+    sc3 = return("The Full Atlas Main Figures tab presents the full single-nuclei dataset as two UMAP panels: an overview colored by annotated cell type, and the same embedding split by seminiferous tubule stage (I-XII) to reveal how populations shift across the spermatogenic cycle. Users can selectively highlight any combination of cell groups - from germ cell populations (Aund through El16) and stage-stratified Sertoli cells (SC_I-VIII through SC_All_Stages) to somatic populations (PTM, Leydig, Macrophage) - and adjust point size and cell labels before exporting publication-ready figures."),
+    sc4 = return("The Sertoli Subset section provides a focused view of Sertoli cells isolated from the broader Full Atlas dataset. The Main Figures tab displays a UMAP colored by cell type (showing Sertoli stage subsets SC_I-VIII, SC_VII-VIII, SC_IX-XII, SC_XI-VI, and SC_All_Stages) alongside stage-split UMAP panels, revealing how Sertoli cell transcriptional states vary across the spermatogenic cycle. Additional views within this subset - including gene expression overlays, violin/boxplots, proportion plots, and bubble/heatmaps - allow deep exploration of Sertoli-specific gene programs, making this subset particularly useful for investigating how Sertoli cells support germ cell development in a stage-dependent manner."),
+    sc5 = return("The Spermatogonia Subset focuses on the earliest germ cells in the spermatogenic lineage, capturing populations from undifferentiated spermatogonia (Aund) through the differentiating spermatogonial types (A1-2, A3-4, Ain, Type B) and into early preleptotene spermatocytes (ePL, lPL). The UMAP overview and stage-split panels highlight how these progenitor populations cluster and transition across tubule stages, while the full suite of interactive figure types (gene expression plots, pairwise comparisons, violin plots, proportion plots, and heatmaps) enables users to interrogate the molecular programs that distinguish self-renewing from differentiating spermatogonia, including responses to niche signals such as GDNF and KITL."),
+    sc6 = return("The Spermatocyte Subset covers the meiotic phase of spermatogenesis, encompassing cells from leptotene through diplotene/MI (L, L/Z, Z, PaI-VI, PaVII-VIII, PaIX-X, D/MI). The UMAP for this subset reveals a distinctive arc-like or continuum structure reflecting the ordered progression through meiotic prophase I and beyond, with stage-split panels showing which meiotic substages predominate at each tubule stage (I-XII). The interactive tools available within this subset support exploration of meiosis-specific gene programs, including synaptonemal complex components, DNA repair machinery, and recombination-related transcripts, across both cell identity and stage dimensions."),
+    sc7 = return("The Spermatid Subset encompasses the post-meiotic phase of spermatogenesis, covering round and elongating spermatid populations from Rd1 through El16. The UMAP for this subset reveals distinct clusters corresponding to progressive stages of spermiogenesis - including the dramatic morphological and transcriptional remodeling associated with acrosome formation, nuclear elongation, and flagellum assembly - with stage-split panels linking each population to its corresponding tubule stage context. The full set of interactive figure types available within this subset allows users to trace the expression dynamics of spermatid-specific genes across this extended differentiation continuum, making it a valuable resource for studying the transcriptional programs that underpin sperm head and tail development."),
+    return(NULL)
   )
 }
 
@@ -266,7 +286,7 @@ build_main_figures_explanation_box <- function(prefix) {
     return(NULL)
   }
 
-  tags$div(
+  return(tags$div(
     class = "figure-expl-wrap",
     tags$details(
       class = "figure-expl-details",
@@ -283,9 +303,14 @@ build_main_figures_explanation_box <- function(prefix) {
         )
       )
     )
-  )
+  ))
 }
 
+# ---------------------------------------------------------------------------
+# Shared ShinyCell control builders
+# ---------------------------------------------------------------------------
+# Dimension-reduction selectors should prefer UMAP/tSNE/PC labels when present,
+# matching the way users scan the legacy ShinyCell controls.
 ordered_dimred_choices <- function(conf) {
   dr_mask <- !is.na(conf$dimred) & conf$dimred
   dr_choices <- conf$UI[dr_mask]
@@ -300,18 +325,20 @@ ordered_dimred_choices <- function(conf) {
   pc_choices <- dr_choices[grepl("^PC", dr_choices, ignore.case = TRUE)]
   other_choices <- setdiff(dr_choices, c(umap_choices, tsne_choices, pc_choices))
 
-  unique(c(umap_choices, tsne_choices, pc_choices, other_choices))
+  return(unique(c(umap_choices, tsne_choices, pc_choices, other_choices)))
 }
 
+# Build controls reused by embedding-based tabs: axes, optional subsetting, and
+# common display settings. Callers add tab-specific overlay controls.
 build_common_controls <- function(prefix, block, conf, def) {
   make_id <- function(suffix) paste0(prefix, block, suffix)
   dimred_choices <- ordered_dimred_choices(conf)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
-    base <- list(
-      ra_rowgroup(
-        "Dimension reduction",
-        ra_field(
-          "X-axis",
+  base <- list(
+    ra_rowgroup(
+      "Dimension reduction",
+      ra_field(
+        "X-axis",
         selectInput(
           inputId = make_id("drX"),
           label = NULL,
@@ -320,7 +347,7 @@ build_common_controls <- function(prefix, block, conf, def) {
         )
       ),
       ra_field(
-          "Y-axis",
+        "Y-axis",
         selectInput(
           inputId = make_id("drY"),
           label = NULL,
@@ -355,82 +382,83 @@ build_common_controls <- function(prefix, block, conf, def) {
           class = "btn btn-outline-secondary btn-sm"
         )
       )
+    ),
+    ra_rowgroup(
+      "Display options",
+      ra_field(
+        "Point size",
+        sliderInput(
+          inputId = make_id("siz"),
+          label = NULL,
+          min = 0,
+          max = 4,
+          value = 1.25,
+          step = 0.25
+        )
       ),
-      ra_rowgroup(
-        "Display options",
-        ra_field(
-          "Point size",
-          sliderInput(
-            inputId = make_id("siz"),
-            label = NULL,
-            min = 0,
-            max = 4,
-            value = 1.25,
-            step = 0.25
-          )
-        ),
-        ra_field(
-          "Plot size",
-          radioButtons(
-            inputId = make_id("psz"),
-            label = NULL,
-            choices = c("Small", "Medium", "Large"),
-            selected = "Large",
-            inline = TRUE
-          )
-        ),
-        ra_field(
-          "Font size",
-          radioButtons(
-            inputId = make_id("fsz"),
-            label = NULL,
-            choices = c("Small", "Medium", "Large"),
-            selected = "Medium",
-            inline = TRUE
-          )
-        ),
-        tags$div(
-          class = "ra-field-checkbox",
-          checkboxInput(
-            inputId = make_id("leg"),
-            label = "Show legend",
-            value = TRUE
-          )
-        ),
-        ra_field(
-          "Aspect ratio",
-          radioButtons(
-            inputId = make_id("asp"),
-            label = NULL,
-            choices = c("Square", "Fixed", "Free"),
-            selected = "Free",
-            inline = TRUE
-          )
-        ),
-        ra_field(
-          "Split by stage (sample)",
-          checkboxInput(
-            inputId = make_id("split"),
-            label = NULL,
-            value = FALSE
-          )
-        ),
-        tags$div(
-          class = "ra-field-checkbox",
-          checkboxInput(
-            inputId = make_id("txt"),
-            label = "Show axis text",
+      ra_field(
+        "Plot size",
+        radioButtons(
+          inputId = make_id("psz"),
+          label = NULL,
+          choices = c("Small", "Medium", "Large"),
+          selected = "Large",
+          inline = TRUE
+        )
+      ),
+      ra_field(
+        "Font size",
+        radioButtons(
+          inputId = make_id("fsz"),
+          label = NULL,
+          choices = c("Small", "Medium", "Large"),
+          selected = "Medium",
+          inline = TRUE
+        )
+      ),
+      tags$div(
+        class = "ra-field-checkbox",
+        checkboxInput(
+          inputId = make_id("leg"),
+          label = "Show legend",
+          value = TRUE
+        )
+      ),
+      ra_field(
+        "Aspect ratio",
+        radioButtons(
+          inputId = make_id("asp"),
+          label = NULL,
+          choices = c("Square", "Fixed", "Free"),
+          selected = "Free",
+          inline = TRUE
+        )
+      ),
+      ra_field(
+        "Split by stage (sample)",
+        checkboxInput(
+          inputId = make_id("split"),
+          label = NULL,
+          value = FALSE
+        )
+      ),
+      tags$div(
+        class = "ra-field-checkbox",
+        checkboxInput(
+          inputId = make_id("txt"),
+          label = "Show axis text",
           value = FALSE
         )
       )
     )
   )
-  list(
+  return(list(
     base = base,
     advanced = advanced
-  )
+  ))
 }
 
+# Build a metadata overlay selector plus the matching styling controls.
 build_cellinfo_overlay_controls <- function(prefix, block, suffix, conf, default_meta) {
   make_id <- function(part) paste0(prefix, block, part)
   cellinfo_choices <- get_cellinfo_choices(conf, grouped_only = FALSE, include_dimred = FALSE)
@@ -448,18 +476,7 @@ build_cellinfo_overlay_controls <- function(prefix, block, suffix, conf, default
         label = NULL,
         choices = cellinfo_choices,
         selected = default_meta
-      ) %>%
-        helper(
-          type = "inline",
-          size = "m",
-          fade = TRUE,
-          title = "Cell information to colour cells by",
-          content = c(
-            "Select cell information to colour cells",
-            "- Categorical covariates have a fixed colour palette",
-            "- Continuous covariates are coloured in a Blue-Yellow-Red colour scheme, which can be changed in the plot controls"
-          )
-        )
+      )
     )
   )
   advanced <- ra_rowgroup(
@@ -492,12 +509,13 @@ build_cellinfo_overlay_controls <- function(prefix, block, suffix, conf, default
       )
     )
   )
-  list(
+  return(list(
     base = list(base),
     advanced = list(advanced)
-  )
+  ))
 }
 
+# Build a gene expression overlay selector plus the matching styling controls.
 build_gene_overlay_controls <- function(prefix, block, suffix, colour_default = "White-Red", order_default = "Max-1st") {
   make_id <- function(part) paste0(prefix, block, part)
   title <- if (suffix == "1") {
@@ -549,12 +567,17 @@ build_gene_overlay_controls <- function(prefix, block, suffix, colour_default = 
       )
     )
   )
-  list(
+  return(list(
     base = list(base),
     advanced = list(advanced)
-  )
+  ))
 }
 
+# ---------------------------------------------------------------------------
+# Shared output and download builders
+# ---------------------------------------------------------------------------
+# Output builders only create placeholders. server.R binds renderers with the
+# exact same prefix/block/suffix convention.
 build_cellinfo_output_section <- function(prefix,
                                           block,
                                           suffix,
@@ -578,12 +601,14 @@ build_cellinfo_output_section <- function(prefix,
       )
     )
   }
-  do.call(
+  return(do.call(
     ra_rowgroup,
     c(list(title), content)
-  )
+  ))
 }
 
+# Build one PDF/PNG download row for an output whose IDs follow the ShinyCell
+# output naming convention.
 build_plot_download_entry <- function(prefix,
                                       block,
                                       suffix,
@@ -591,7 +616,7 @@ build_plot_download_entry <- function(prefix,
                                       height_value,
                                       width_value) {
   make_id <- function(part) paste0(prefix, block, part)
-  ra_download_entry(
+  return(ra_download_entry(
     pdf_id = make_id(paste0("oup", suffix, ".pdf")),
     png_id = make_id(paste0("oup", suffix, ".png")),
     height_id = make_id(paste0("oup", suffix, ".h")),
@@ -600,12 +625,13 @@ build_plot_download_entry <- function(prefix,
     height_value = height_value,
     width_value = width_value,
     title = title
-  )
+  ))
 }
 
+# Main-figure downloads have separate overview and stage-split outputs.
 build_main_figures_download_entries <- function(prefix) {
   make_id <- function(part) paste0(prefix, "mf", part)
-  tagList(
+  return(tagList(
     ra_download_entry(
       pdf_id = make_id("main.pdf"),
       png_id = make_id("main.png"),
@@ -626,9 +652,10 @@ build_main_figures_download_entries <- function(prefix) {
       width_value = 10,
       title = "Stage-split UMAPs"
     )
-  )
+  ))
 }
 
+# Build the collapsible statistics table used by several detailed tabs.
 build_cellinfo_stats_output <- function(prefix,
                                         block,
                                         selected = "Decile",
@@ -640,7 +667,7 @@ build_cellinfo_stats_output <- function(prefix,
   if (!is.null(table_wrap_class) && nzchar(table_wrap_class)) {
     table_output <- tags$div(class = table_wrap_class, table_output)
   }
-  tags$div(
+  return(tags$div(
     class = "ra-rowgroup",
     tags$div(
       style = "display:flex; align-items:center; justify-content:space-between; gap:12px;",
@@ -673,7 +700,7 @@ build_cellinfo_stats_output <- function(prefix,
       },
       table_output
     )
-  )
+  ))
 }
 
 build_gene_output_section <- function(prefix,
@@ -681,15 +708,21 @@ build_gene_output_section <- function(prefix,
                                       suffix,
                                       title) {
   make_id <- function(part) paste0(prefix, block, part)
-  ra_rowgroup(
+  return(ra_rowgroup(
     title,
     tags$div(
       class = "ra-plot-holder",
       uiOutput(make_id(paste0("oup", suffix, ".ui")))
     )
-  )
+  ))
 }
 
+# ---------------------------------------------------------------------------
+# Top-level dataset tab builders
+# ---------------------------------------------------------------------------
+# Each builder returns either a full tabPanel or the tab content body. Lazy tab
+# registration uses as_tab = FALSE so server.R can insert content after first
+# navigation into a dataset route.
 build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "mf", part)
 
@@ -804,16 +837,17 @@ build_main_figures_tab <- function(prefix, conf, def, dataset_name, as_tab = TRU
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("Main Figures"),
       value = sprintf("%s_main_figures", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# CellInfo vs GeneExpr: paired metadata and gene overlays on the same embedding.
 build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "a1", part)
   common <- build_common_controls(prefix, "a1", conf, def)
@@ -890,16 +924,17 @@ build_cellinfo_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TR
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("CellInfo vs GeneExpr"),
       value = sprintf("%s_cellinfo_gene", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# Multiple GeneExpr: dotplot-style multi-gene summaries by selected grouping.
 build_multiple_geneexpr_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "m1", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
@@ -1115,16 +1150,17 @@ build_multiple_geneexpr_tab <- function(prefix, conf, def, dataset_name, as_tab 
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("Multiple GeneExpr"),
       value = sprintf("%s_multiple_geneexpr", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# CellInfo vs CellInfo: two metadata overlays for direct visual comparison.
 build_cellinfo_cellinfo_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "a2", part)
   common <- build_common_controls(prefix, "a2", conf, def)
@@ -1198,16 +1234,17 @@ build_cellinfo_cellinfo_tab <- function(prefix, conf, def, dataset_name, as_tab 
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("CellInfo vs CellInfo"),
       value = sprintf("%s_cellinfo_cellinfo", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# GeneExpr vs GeneExpr: two independent gene overlays on the same embedding.
 build_gene_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "a3", part)
   common <- build_common_controls(prefix, "a3", conf, def)
@@ -1281,16 +1318,17 @@ build_gene_gene_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) 
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("GeneExpr vs GeneExpr"),
       value = sprintf("%s_gene_gene", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# Bubbleplot / Heatmap: grouped average-expression summaries for gene lists.
 build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "d1", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
@@ -1435,7 +1473,7 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
         inputId = make_id("fsz"),
         label = NULL,
         choices = c("Small", "Medium", "Large"),
-        selected = "Medium",
+        selected = "Small",
         inline = TRUE
       )
     ),
@@ -1523,16 +1561,17 @@ build_bubble_heatmap_tab <- function(prefix, conf, def, dataset_name, as_tab = T
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("Bubbleplot / Heatmap"),
       value = sprintf("%s_bubble_heatmap", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# Gene coexpression: two-gene overlay with supporting legend and cell counts.
 build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   common <- build_common_controls(prefix, "b2", conf, def)
   make_id <- function(part) paste0(prefix, "b2", part)
@@ -1711,16 +1750,17 @@ build_gene_coexpression_tab <- function(prefix, conf, def, dataset_name, as_tab 
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("Gene coexpression"),
       value = sprintf("%s_gene_coexpression", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# Violinplot / Boxplot: distribution plots for continuous metadata or genes.
 build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "c1", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
@@ -1928,16 +1968,17 @@ build_violin_boxplot_tab <- function(prefix, conf, def, dataset_name, as_tab = T
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("Violinplot / Boxplot"),
       value = sprintf("%s_violin_boxplot", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }
 
+# Proportion plot: grouped count/proportion bars for categorical metadata.
 build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = TRUE) {
   make_id <- function(part) paste0(prefix, "c2", part)
   grouped_choices <- get_cellinfo_choices(conf, grouped_only = TRUE, include_dimred = FALSE)
@@ -2159,12 +2200,12 @@ build_proportion_plot_tab <- function(prefix, conf, def, dataset_name, as_tab = 
   )
 
   if (as_tab) {
-    tabPanel(
+    return(tabPanel(
       title = HTML("Proportion plot"),
       value = sprintf("%s_proportion_plot", prefix),
       content
-    )
+    ))
   } else {
-    content
+    return(content)
   }
 }

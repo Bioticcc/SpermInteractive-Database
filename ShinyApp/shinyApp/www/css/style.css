@@ -1,0 +1,10 @@
+/* ---------------------------------------------------------------------------
+   SpermInteractive CSS manifest
+   ---------------------------------------------------------------------------
+   Import order matters: theme tokens first, then page layout, shared tab
+   surfaces, and finally interactive-data overrides.
+*/
+@import url("theme.css");
+@import url("layout.css");
+@import url("legacy-tabs.css");
+@import url("interactive-data.css");

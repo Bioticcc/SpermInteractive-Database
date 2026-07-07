@@ -1,10 +1,16 @@
+# ---------------------------------------------------------------------------
+# HAR network benchmark
+# ---------------------------------------------------------------------------
 # Benchmark Firefox/DevTools HAR exports for the published home route.
 # Run from the repo root with:
-#   Rscript ShinyApp/shinyApp/bench_network_har.R path/to/home_cold_1.har path/to/home_cold_2.har
+#   Rscript ShinyApp/shinyApp/scripts/benchmarks/bench_network_har.R path/to/home_cold_1.har path/to/home_cold_2.har
 #
 # Filenames containing "cold" or "warm" are grouped automatically so the script
 # can report per-scenario medians across repeated runs.
 
+# ---------------------------------------------------------------------------
+# Package imports and small helpers
+# ---------------------------------------------------------------------------
 suppressPackageStartupMessages({
   library(jsonlite)
 })
@@ -13,14 +19,14 @@ suppressPackageStartupMessages({
   if (is.null(x) || length(x) == 0) {
     return(y)
   }
-  x
+  return(x)
 }
 
 usage <- function() {
   stop(
     paste(
       "Usage:",
-      "Rscript ShinyApp/shinyApp/bench_network_har.R",
+      "Rscript ShinyApp/shinyApp/scripts/benchmarks/bench_network_har.R",
       "path/to/home_cold_1.har [path/to/home_cold_2.har ...]",
       sep = "\n  "
     ),
@@ -28,12 +34,14 @@ usage <- function() {
   )
 }
 
+# HAR exports vary by browser and DevTools version. The safe converters keep the
+# summarizer tolerant of missing or malformed optional fields.
 safe_num <- function(x, default = 0) {
   value <- suppressWarnings(as.numeric(x)[1])
   if (is.na(value)) {
     return(default)
   }
-  value
+  return(value)
 }
 
 safe_chr <- function(x, default = "") {
@@ -41,7 +49,7 @@ safe_chr <- function(x, default = "") {
   if (is.na(value) || !nzchar(value)) {
     return(default)
   }
-  value
+  return(value)
 }
 
 format_bytes <- function(bytes) {
@@ -52,7 +60,7 @@ format_bytes <- function(bytes) {
     bytes <- bytes / 1024
     scale <- scale + 1L
   }
-  sprintf("%.1f %s", bytes, units[[scale]])
+  return(sprintf("%.1f %s", bytes, units[[scale]]))
 }
 
 detect_scenario <- function(path) {
@@ -63,19 +71,24 @@ detect_scenario <- function(path) {
   if (grepl("warm", name, fixed = TRUE)) {
     return("warm")
   }
-  "unlabeled"
+  return("unlabeled")
 }
 
 normalize_url <- function(url) {
   url <- safe_chr(url)
   url <- sub("#.*$", "", url)
-  sub("\\?.*$", "", url)
+  return(sub("\\?.*$", "", url))
 }
 
+# ---------------------------------------------------------------------------
+# HAR entry extraction
+# ---------------------------------------------------------------------------
 entry_mime_type <- function(entry) {
-  tolower(safe_chr(entry$response$content$mimeType))
+  return(tolower(safe_chr(entry$response$content$mimeType)))
 }
 
+# Prefer explicit transfer-size fields when available; otherwise fall back to
+# headersSize + bodySize from the HAR response object.
 entry_transfer_bytes <- function(entry) {
   response <- entry$response %||% list()
   response_transfer <- response[["_transferSize"]]
@@ -94,9 +107,11 @@ entry_transfer_bytes <- function(entry) {
     return(total)
   }
 
-  0
+  return(0)
 }
 
+# Approximate time to first byte from HAR timing components. Negative timings are
+# browser placeholders and should not reduce the reported total.
 entry_ttfb_ms <- function(entry) {
   timings <- entry$timings %||% list()
   components <- c(
@@ -115,9 +130,11 @@ entry_ttfb_ms <- function(entry) {
 
   receive <- safe_num(timings$receive, default = 0)
   request_time <- safe_num(entry$time, default = 0)
-  max(request_time - max(receive, 0), 0)
+  return(max(request_time - max(receive, 0), 0))
 }
 
+# Assign broad request categories used by the summary table. Bootstrap includes
+# Shiny websocket/client setup traffic that is not ordinary app JavaScript.
 entry_category <- function(entry) {
   url <- tolower(normalize_url(entry$request$url))
   mime <- entry_mime_type(entry)
@@ -137,7 +154,7 @@ entry_category <- function(entry) {
   if (grepl("sockjs|shiny-server-client|/websocket|websocket", url)) {
     return("bootstrap")
   }
-  "other"
+  return("other")
 }
 
 entry_row <- function(entry) {
@@ -146,7 +163,7 @@ entry_row <- function(entry) {
   transfer_bytes <- entry_transfer_bytes(entry)
   category <- entry_category(entry)
 
-  data.frame(
+  return(data.frame(
     started = safe_chr(entry$startedDateTime),
     method = safe_chr(entry$request$method),
     url = url,
@@ -159,9 +176,12 @@ entry_row <- function(entry) {
     category = category,
     is_bootstrap = identical(category, "bootstrap"),
     stringsAsFactors = FALSE
-  )
+  ))
 }
 
+# ---------------------------------------------------------------------------
+# Summary construction
+# ---------------------------------------------------------------------------
 read_har_entries <- function(path) {
   payload <- jsonlite::fromJSON(path, simplifyVector = FALSE)
   entries <- payload$log$entries
@@ -173,23 +193,23 @@ read_har_entries <- function(path) {
   out <- do.call(rbind, rows)
   out$file <- normalizePath(path, mustWork = FALSE)
   out$scenario <- detect_scenario(path)
-  out
+  return(out)
 }
 
 metric_row <- function(entries, category) {
   rows <- entries[entries$category == category, , drop = FALSE]
-  data.frame(
+  return(data.frame(
     request_count = nrow(rows),
     transfer_bytes = sum(rows$transfer_bytes, na.rm = TRUE),
     request_time_ms = sum(rows$request_time_ms, na.rm = TRUE),
     ttfb_ms = sum(rows$ttfb_ms, na.rm = TRUE),
     stringsAsFactors = FALSE
-  )
+  ))
 }
 
 top_requests <- function(entries, limit = 10L) {
   rows <- entries[order(-entries$transfer_bytes, -entries$request_time_ms), , drop = FALSE]
-  head(rows[, c("status", "transfer_bytes", "request_time_ms", "ttfb_ms", "category", "url")], limit)
+  return(head(rows[, c("status", "transfer_bytes", "request_time_ms", "ttfb_ms", "category", "url")], limit))
 }
 
 summarize_har <- function(path) {
@@ -214,16 +234,21 @@ summarize_har <- function(path) {
     bootstrap = metric_row(entries, "bootstrap"),
     top_requests = top_requests(entries, limit = 10L)
   )
-  metrics
+  return(metrics)
 }
 
+# ---------------------------------------------------------------------------
+# Console reporting
+# ---------------------------------------------------------------------------
 print_metric_block <- function(label, metrics) {
-  cat(sprintf("%-12s requests: %3d | bytes: %10s | total ms: %8.1f | TTFB ms: %8.1f\n",
-              paste0(label, ":"),
-              metrics$request_count[[1]],
-              format_bytes(metrics$transfer_bytes[[1]]),
-              metrics$request_time_ms[[1]],
-              metrics$ttfb_ms[[1]]))
+  return(cat(sprintf(
+    "%-12s requests: %3d | bytes: %10s | total ms: %8.1f | TTFB ms: %8.1f\n",
+    paste0(label, ":"),
+    metrics$request_count[[1]],
+    format_bytes(metrics$transfer_bytes[[1]]),
+    metrics$request_time_ms[[1]],
+    metrics$ttfb_ms[[1]]
+  )))
 }
 
 print_summary <- function(summary) {
@@ -257,8 +282,11 @@ print_summary <- function(summary) {
       row$url[[1]]
     ))
   }
+  return(invisible(NULL))
 }
 
+# Print median values across repeated cold/warm captures when filenames make
+# the scenario detectable.
 scenario_medians <- function(summaries) {
   scenarios <- unique(vapply(summaries, `[[`, character(1), "scenario"))
   scenarios <- scenarios[scenarios != "unlabeled"]
@@ -274,7 +302,7 @@ scenario_medians <- function(summaries) {
     }
 
     metric_vector <- function(path) {
-      vapply(subset, function(x) path(x), numeric(1))
+      return(vapply(subset, function(x) path(x), numeric(1)))
     }
 
     cat(sprintf("\n%s (%d runs)\n", scenario, length(subset)))
@@ -283,14 +311,14 @@ scenario_medians <- function(summaries) {
     cat(sprintf("  total transferred: %s\n", format_bytes(median(metric_vector(function(x) x$total_transferred_bytes)))))
 
     print_scenario_block <- function(label, extractor) {
-      cat(sprintf(
+      return(cat(sprintf(
         "  %-12s requests: %3.0f | bytes: %10s | total ms: %8.1f | TTFB ms: %8.1f\n",
         paste0(label, ":"),
         median(metric_vector(function(x) extractor(x)$request_count[[1]])),
         format_bytes(median(metric_vector(function(x) extractor(x)$transfer_bytes[[1]]))),
         median(metric_vector(function(x) extractor(x)$request_time_ms[[1]])),
         median(metric_vector(function(x) extractor(x)$ttfb_ms[[1]]))
-      ))
+      )))
     }
 
     print_scenario_block("css", function(x) x$css)
@@ -298,8 +326,12 @@ scenario_medians <- function(summaries) {
     print_scenario_block("image", function(x) x$image)
     print_scenario_block("bootstrap", function(x) x$bootstrap)
   }
+  return(invisible(NULL))
 }
 
+# ---------------------------------------------------------------------------
+# Script entrypoint
+# ---------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 if (!length(args)) {
   usage()

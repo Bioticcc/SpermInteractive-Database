@@ -1,9 +1,12 @@
+# ---------------------------------------------------------------------------
+# Spermatogenesis table button mapping
+# ---------------------------------------------------------------------------
+# This data-as-code file maps clickable SVG/table button IDs to the stage and
+# specific-cell labels used by the precomputed expression matrix. It is sourced
+# by server.R at runtime and by build_interactive_assets.R during asset rebuilds.
 
-
-#NOTE FOR FUTURE ME: THIS ONE IS CALLED BUTTON_MAPPING_GENERAL BUT THE LIST IS 
-#ALWAYS CALLED GENERAL_BUTTON_MAPPING. THIS IS THE ONE WE MANUALLY TYPED I THINK
-#GOING TO TRY SPECIFIC THO.
-#TODO: Make specificCellID instead general, manually match from picture to button.
+# Maps spermatogenesis SVG button IDs to stage and cell-type labels. The same
+# mapping is used by the runtime modal and the interactive-asset build script.
 general_button_mapping <- list(
   "btn_1_1" = list(sample = "I-VI (Weak to Strong)", specificCellID = "El12-13"),
   "btn_1_2" = list(sample = "I-VI (Weak to Strong)", specificCellID = "El14-15"),
@@ -19,7 +22,7 @@ general_button_mapping <- list(
   "btn_2_5" = list(sample = "I-VI (Weak to Strong)", specificCellID = "Rd6"),
   "btn_2_6" = list(sample = "VII-VIII (Dark)", specificCellID = "Rd7"),
   "btn_2_7" = list(sample = "VII-VIII (Dark)", specificCellID = "Rd8"),
-  "btn_2_8" = list(sample = "IX-X (Pale)", specificCellID = "El8"), #COMES UP EMPTY, GOTTA CHANGE LATER
+  "btn_2_8" = list(sample = "IX-X (Pale)", specificCellID = "El9"),
   "btn_2_9" = list(sample = "IX-X (Pale)", specificCellID = "El9"),
   "btn_2_10" = list(sample = "XI-XII (Pale to Weak)", specificCellID = "El10"),
   "btn_2_11" = list(sample = "XI-XII (Pale to Weak)", specificCellID = "El12-13"),

@@ -1,4 +1,12 @@
 "version_number","update_type","update_title","update_description","update_date"
+"0.9.1","Major","Tutorial Update","* Added a tutorial, allowing users to move through a series of tutorial steps to familiarize themselves with the website, and how to use and navigate it.
+
+* Fixed various popup bugs, mainly related to spam clicking a popup button like the Download Figures button while a page was still refreshing.
+
+* Additional minor bug fixes and improvements.","2026-07-03"
+"0.8.4","Minor","","* Modified several css styling rules to improve cross-browser compatibility.
+
+* Changed default font size to small for bubbleplot/heatmap pages.","2026-06-17"
 "0.8.3","Minor","","* Updated dark mode UI so the logo is less jarring, as well as fixing other minor dark mode related bugs
 
 * Updated descriptions and explanation text for multiple sections.

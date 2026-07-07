@@ -1,5 +1,15 @@
 #!/usr/bin/env Rscript
 
+# ---------------------------------------------------------------------------
+# Build ShinyCell dataset assets
+# ---------------------------------------------------------------------------
+# This script converts one Seurat object into the conf/def/gene/gexpr/meta files
+# consumed by the app's generic dataset tabs. It also patches generated config
+# defaults and palettes to match the curated SpermInteractive display contract.
+
+# ---------------------------------------------------------------------------
+# Package imports and app-root bootstrap
+# ---------------------------------------------------------------------------
 suppressPackageStartupMessages({
   library(Seurat)
   library(ShinyCell)
@@ -12,27 +22,31 @@ bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
 } else {
   getwd()
 }
-source(file.path(bootstrap_dir, "app_support.R"))
-app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+app_root <- normalizePath(file.path(bootstrap_dir, "..", ".."), mustWork = FALSE)
+source(file.path(app_root, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = app_root))
 
+# ---------------------------------------------------------------------------
+# Command-line arguments
+# ---------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
   stop(
     paste(
       "Usage:",
-      "  Rscript build_shinycell_assets.R <seurat_rds> <prefix> [out_dir] [chunk_size]",
+      "  Rscript ShinyApp/shinyApp/scripts/build/build_shinycell_assets.R <seurat_rds> <prefix> [out_dir] [chunk_size]",
       "",
       "Example:",
-      "  Rscript ShinyApp/shinyApp/build_shinycell_assets.R /path/to/02_Sertoli.rds sc4 ShinyApp/shinyApp 500",
+      "  Rscript ShinyApp/shinyApp/scripts/build/build_shinycell_assets.R /path/to/02_Sertoli.rds sc4 ShinyApp/shinyApp/Data 500",
       sep = "\n"
     ),
     call. = FALSE
   )
 }
 
-seurat_path <- sc_first_existing(c(args[[1]]), app_dir = app_dir)
+seurat_path <- sc_first_existing(sc_data_candidates(c(args[[1]])), app_dir = app_dir)
 prefix <- args[[2]]
-out_dir <- if (length(args) >= 3) sc_dir_arg(args[[3]], app_dir = app_dir) else app_dir
+out_dir <- if (length(args) >= 3) sc_dir_arg(args[[3]], app_dir = app_dir) else sc_data_dir(app_dir = app_dir, create = TRUE)
 chunk_size <- if (length(args) >= 4) as.integer(args[[4]]) else 500L
 if (is.na(chunk_size) || chunk_size <= 0) {
   chunk_size <- 500L
@@ -48,7 +62,11 @@ if (!dir.exists(out_dir)) {
 ensure_trailing_sep <- function(path) file.path(path, "")
 shiny_dir <- ensure_trailing_sep(out_dir)
 
-# Paper-matched palette for correct_cellTypes
+# ---------------------------------------------------------------------------
+# Curated cell-type palette
+# ---------------------------------------------------------------------------
+# Paper-matched palette for correct_cellTypes. The post-generation patch below
+# applies these colors to the ShinyCell config when the labels are available.
 my_cols <- c(
   "Aund" = "#d13732",
   "A1-2" = "#e89d9b",
@@ -94,6 +112,11 @@ if (inherits(obj, "Seurat")) {
   obj@images <- list()
 }
 
+# ---------------------------------------------------------------------------
+# Pre-generation object normalization
+# ---------------------------------------------------------------------------
+# Normalize reduction axis names so downstream UI labels are stable across
+# Seurat exports.
 standardize_umap <- function(seu) {
   if (!inherits(seu, "Seurat")) {
     return(seu)
@@ -112,9 +135,11 @@ standardize_umap <- function(seu) {
       colnames(seu@reductions[[r]]@cell.embeddings)[1:2] <- c("UMAP_1", "UMAP_2")
     }
   }
-  seu
+  return(seu)
 }
 
+# Add the curated full-atlas cell-type labels to legacy subset objects when they
+# do not already carry correct_cellTypes.
 add_correct_celltypes <- function(seu, mapping_path) {
   if (!inherits(seu, "Seurat")) {
     return(seu)
@@ -184,12 +209,15 @@ add_correct_celltypes <- function(seu, mapping_path) {
     ct <- factor(ct)
   }
   seu@meta.data$correct_cellTypes <- ct
-  seu
+  return(seu)
 }
 
 obj <- standardize_umap(obj)
 obj <- add_correct_celltypes(obj, file.path(out_dir, "sc3meta.rds"))
 
+# ---------------------------------------------------------------------------
+# ShinyCell file generation
+# ---------------------------------------------------------------------------
 assays <- tryCatch(Seurat::Assays(obj), error = function(e) character(0))
 assay <- if ("RNA" %in% assays) "RNA" else tryCatch(Seurat::DefaultAssay(obj), error = function(e) NA_character_)
 if (is.na(assay) || !nzchar(assay)) {
@@ -207,7 +235,7 @@ if ("JoinLayers" %in% getNamespaceExports("Seurat")) {
     Seurat::JoinLayers(obj),
     error = function(e) {
       message(sprintf("JoinLayers() skipped/failed: %s", conditionMessage(e)))
-      obj
+      return(obj)
     }
   )
 }
@@ -227,6 +255,9 @@ ShinyCell::makeShinyFiles(
   chunkSize = chunk_size
 )
 
+# ---------------------------------------------------------------------------
+# Generated-file validation
+# ---------------------------------------------------------------------------
 conf_path <- file.path(out_dir, paste0(prefix, "conf.rds"))
 def_path <- file.path(out_dir, paste0(prefix, "def.rds"))
 meta_path <- file.path(out_dir, paste0(prefix, "meta.rds"))
@@ -248,6 +279,11 @@ if (!file.exists(conf_path) || !file.exists(def_path) || !file.exists(meta_path)
   )
 }
 
+# ---------------------------------------------------------------------------
+# Default and palette patching
+# ---------------------------------------------------------------------------
+# ShinyCell's generated defaults are generic. Patch them so the app opens on the
+# curated cell-type annotation and uses the project palette for correct_cellTypes.
 message("Patching defaults + paper-matched palette…")
 meta <- readRDS(meta_path)
 conf <- as.data.table(readRDS(conf_path))

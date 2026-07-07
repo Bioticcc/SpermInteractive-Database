@@ -2,14 +2,21 @@
 
 # Reference and backup artifacts
 archive
+www/archive
 backupFiles
-Rplots.pdf
-all_figures.pdf
 
 # Local deployment metadata
 rsconnect
 
 # Large raw objects not needed at runtime
+Data/M_Seurat_object.rds
+Data/final_staged_object.rds
+Data/final_staged_object_slim.rds
+Data/final_staged_object_slim_nocounts.rds
+Data/specificCellID.rds
+Data/specificCellID_slim.rds
+Data/specificCellID_slim_nocounts.rds
+Data/specificCellID_Original.rds
 final_staged_object.rds
 final_staged_object_slim.rds
 final_staged_object_slim_nocounts.rds
@@ -19,12 +26,26 @@ specificCellID_slim_nocounts.rds
 specificCellID_Original.rds
 
 # Raw subset objects used only for asset generation
+Data/02_Sertoli.rds
+Data/03_Spermatogonia_original.rds
+Data/04_Spermatocyte_updated.rds
+Data/05_Spermatid.rds
 02_Sertoli.rds
 03_Spermatogonia_original.rds
 04_Spermatocyte_updated.rds
 05_Spermatid.rds
 
 # Disabled datasets for launch build
+Data/sc1conf.rds
+Data/sc1def.rds
+Data/sc1gene.rds
+Data/sc1gexpr.h5
+Data/sc1meta.rds
+Data/sc2conf.rds
+Data/sc2def.rds
+Data/sc2gene.rds
+Data/sc2gexpr.h5
+Data/sc2meta.rds
 sc1conf.rds
 sc1def.rds
 sc1gene.rds
@@ -37,7 +58,7 @@ sc2gexpr.h5
 sc2meta.rds
 
 # Reference script not used in runtime path
-RA_Signaling_Figure5 (1).R
+ra_signaling_figure5_reference.R
 
 # Windows ADS artifacts currently present at app root
 RA_Signaling_Figure5 (1).R:Zone.Identifier

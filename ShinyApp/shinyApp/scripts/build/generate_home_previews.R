@@ -1,5 +1,15 @@
 #!/usr/bin/env Rscript
 
+# ---------------------------------------------------------------------------
+# Generate home-page preview images
+# ---------------------------------------------------------------------------
+# This script produces compact runtime thumbnails for the home page plus larger
+# reference previews under www/archive/reference/. Runtime images are written to
+# www/ because the browser loads them directly.
+
+# ---------------------------------------------------------------------------
+# Package imports and app-root bootstrap
+# ---------------------------------------------------------------------------
 suppressPackageStartupMessages({
   library(Seurat)
   library(ggplot2)
@@ -23,36 +33,45 @@ bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
 } else {
   getwd()
 }
-source(file.path(bootstrap_dir, "app_support.R"))
-app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+app_root <- normalizePath(file.path(bootstrap_dir, "..", ".."), mustWork = FALSE)
+source(file.path(app_root, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = app_root))
 
 message("Generating home tab preview images...")
 
+# ---------------------------------------------------------------------------
+# Output paths and image helpers
+# ---------------------------------------------------------------------------
 ensure_dir <- function(path) {
   if (!dir.exists(path)) {
-    dir.create(path, recursive = TRUE, showWarnings = FALSE)
+    return(dir.create(path, recursive = TRUE, showWarnings = FALSE))
   }
 }
 
 output_dir <- sc_www_path(app_dir = app_dir)
 ensure_dir(output_dir)
-reference_output_dir <- sc_app_path("archive", "reference_www", app_dir = app_dir)
+reference_output_dir <- sc_www_path("archive", "reference", app_dir = app_dir)
 ensure_dir(reference_output_dir)
 
 runtime_preview_height_px <- 280L
 
 optional_image_pkg <- paste0("mag", "ick")
 
+# Load the optional image backend dynamically so the script can still run in
+# environments where only png/grid are available.
 load_optional_namespace <- function(pkg_name) {
-  tryCatch(loadNamespace(pkg_name), error = function(...) NULL)
+  return(tryCatch(loadNamespace(pkg_name), error = function(...) NULL))
 }
 
 call_ns <- function(ns, name, ...) {
-  get(name, envir = ns, inherits = FALSE)(...)
+  return(get(name, envir = ns, inherits = FALSE)(...))
 }
 
 image_ns <- load_optional_namespace(optional_image_pkg)
 
+# Downsample source images to the fixed card-preview height used on the home
+# page. The magick path strips metadata and quantizes output; the pure-R path is
+# a compatibility fallback.
 write_runtime_preview <- function(source_path, target_path, height_px = runtime_preview_height_px) {
   target_height <- max(1L, as.integer(height_px))
 
@@ -85,16 +104,21 @@ write_runtime_preview <- function(source_path, target_path, height_px = runtime_
   on.exit(grDevices::dev.off(), add = TRUE)
   grid::grid.newpage()
   grid::grid.raster(img, width = unit(1, "npc"), height = unit(1, "npc"), interpolate = TRUE)
-  invisible(target_path)
+  return(invisible(target_path))
 }
 
 preview_dark_bg <- c(5, 8, 21) / 255
 
+# ---------------------------------------------------------------------------
+# Dark-mode preview transforms
+# ---------------------------------------------------------------------------
+# Build CSS-like color transform matrices in R so generated dark thumbnails look
+# consistent with the app theme without requiring browser rendering.
 preview_hue_rotate_matrix <- function(degrees) {
   angle <- degrees * pi / 180
   cos_a <- cos(angle)
   sin_a <- sin(angle)
-  matrix(
+  return(matrix(
     c(
       0.213 + cos_a * 0.787 - sin_a * 0.213,
       0.715 - cos_a * 0.715 - sin_a * 0.715,
@@ -108,11 +132,11 @@ preview_hue_rotate_matrix <- function(degrees) {
     ),
     nrow = 3,
     byrow = TRUE
-  )
+  ))
 }
 
 preview_saturate_matrix <- function(amount) {
-  matrix(
+  return(matrix(
     c(
       0.213 + 0.787 * amount,
       0.715 - 0.715 * amount,
@@ -126,7 +150,7 @@ preview_saturate_matrix <- function(amount) {
     ),
     nrow = 3,
     byrow = TRUE
-  )
+  ))
 }
 
 write_dark_mode_preview <- function(source_path, target_path) {
@@ -161,9 +185,12 @@ write_dark_mode_preview <- function(source_path, target_path) {
 
   img[, , 1:3] <- array(filtered, dim = c(img_dims[[1]], img_dims[[2]], 3))
   png::writePNG(img, target_path)
-  invisible(target_path)
+  return(invisible(target_path))
 }
 
+# ---------------------------------------------------------------------------
+# RA preview generation
+# ---------------------------------------------------------------------------
 interactive_table_source_path <- file.path(output_dir, "interactiveTable.png")
 interactive_table_preview_path <- file.path(output_dir, "interactiveTable_preview.png")
 interactive_table_dark_preview_path <- file.path(output_dir, "interactiveTable_preview_dark.png")
@@ -171,7 +198,7 @@ ra_runtime_preview_path <- file.path(output_dir, "ra_preview_publication_icon.pn
 ra_dark_runtime_preview_path <- file.path(output_dir, "ra_preview_publication_icon_dark.png")
 
 specific_obj <- readRDS(sc_first_existing(
-  c("specificCellID_slim_nocounts.rds", "specificCellID_slim.rds", "specificCellID.rds"),
+  sc_data_candidates(c("specificCellID_slim_nocounts.rds", "specificCellID_slim.rds", "specificCellID.rds")),
   app_dir = app_dir
 ))
 Idents(specific_obj) <- Idents(specific_obj)
@@ -187,22 +214,24 @@ if (!length(cell_types)) {
   stop("No cell types available in specificCellID object.")
 }
 
+# Build a publication-style RA dotplot preview from the same source genes used by
+# the interactive RA tab defaults.
 make_ra_dotplot <- function(obj, genes, idents_keep) {
   subset_obj <- if (length(idents_keep)) subset(obj, idents = idents_keep) else obj
-  DotPlot(
+  return(DotPlot(
     subset_obj,
-    features  = genes,
+    features = genes,
     dot.scale = 8.25,
-    assay     = NULL,
-    col.min   = -2.5,
-    col.max   = 2.5,
-    dot.min   = 0,
-    idents    = NULL,
-    group.by  = NULL,
-    split.by  = NULL,
+    assay = NULL,
+    col.min = -2.5,
+    col.max = 2.5,
+    dot.min = 0,
+    idents = NULL,
+    group.by = NULL,
+    split.by = NULL,
     cluster.idents = FALSE,
-    scale     = TRUE,
-    scale.by  = "size",
+    scale = TRUE,
+    scale.by = "size",
     scale.min = NA,
     scale.max = 30
   ) +
@@ -235,7 +264,7 @@ make_ra_dotplot <- function(obj, genes, idents_keep) {
       fill = NA,
       colour = "black"
     ) +
-    coord_flip()
+    coord_flip())
 }
 
 line_defaults <- list(
@@ -249,29 +278,31 @@ if (!all(lengths(line_defaults))) {
   stop("One of the default RA line plot gene groups is empty.")
 }
 
+# Build the RA lineplot preview with the same three-row grouping used by the
+# runtime figure controls.
 make_ra_lineplot <- function(obj, row1_genes, row2_genes, row3_genes) {
   Idents(obj) <- "generalCellID"
   all_genes <- unique(c(row1_genes, row2_genes, row3_genes))
   df <- FetchData(obj, vars = c(all_genes, "sample", "generalCellID"))
   df$cell <- rownames(df)
-  
+
   df_long <- reshape2::melt(
     df,
     id.vars = c("cell", "sample", "generalCellID"),
     variable.name = "gene",
     value.name = "zscore"
   )
-  
+
   df_summary <- df_long %>%
     group_by(gene, generalCellID, sample) %>%
     summarise(mean_z = mean(zscore, na.rm = TRUE), .groups = "drop")
-  
+
   df_looped <- df_summary %>%
     filter(sample == "I-VI (Weak to Strong)") %>%
     mutate(sample = "I-VI (looped)")
-  
+
   df_summary_looped <- bind_rows(df_summary, df_looped)
-  
+
   df_summary_looped$stage <- case_when(
     df_summary_looped$sample == "I-VI (Weak to Strong)" ~ "I-VI",
     df_summary_looped$sample == "VII-VIII (Dark)" ~ "VII-VIII",
@@ -281,12 +312,12 @@ make_ra_lineplot <- function(obj, row1_genes, row2_genes, row3_genes) {
     TRUE ~ as.character(df_summary_looped$sample)
   )
   df_summary_looped$stage <- factor(df_summary_looped$stage, levels = c("I-VI", "VII-VIII", "IX-X", "XI-XII"))
-  
+
   df_rescaled <- df_summary_looped %>%
     group_by(gene, generalCellID) %>%
     mutate(scaled_expr = scale(mean_z)[, 1]) %>%
     ungroup()
-  
+
   df_rescaled$plot_row <- case_when(
     df_rescaled$gene %in% row1_genes ~ "Row 1",
     df_rescaled$gene %in% row2_genes ~ "Row 2",
@@ -294,8 +325,8 @@ make_ra_lineplot <- function(obj, row1_genes, row2_genes, row3_genes) {
     TRUE ~ NA_character_
   )
   df_rescaled$plot_row <- factor(df_rescaled$plot_row, levels = c("Row 1", "Row 2", "Row 3"))
-  
-  ggplot(df_rescaled, aes(x = stage, y = scaled_expr, color = gene, group = gene)) +
+
+  return(ggplot(df_rescaled, aes(x = stage, y = scaled_expr, color = gene, group = gene)) +
     geom_line(linewidth = 0.5) +
     geom_point(size = 1.5) +
     facet_grid(plot_row ~ generalCellID, scales = "fixed") +
@@ -310,7 +341,7 @@ make_ra_lineplot <- function(obj, row1_genes, row2_genes, row3_genes) {
       panel.grid.minor = element_blank(),
       plot.margin = unit(c(1, 1, 1, 3.5), "lines"),
       strip.text.y = element_text(angle = 0)
-    )
+    ))
 }
 
 dotplot_path <- file.path(reference_output_dir, "ra_dotplot_preview.png")
@@ -331,7 +362,10 @@ ggsave(lineplot_path, line_plot, width = 6.2, height = 3.6, dpi = 160)
 write_runtime_preview(lineplot_path, ra_runtime_preview_path)
 write_dark_mode_preview(ra_runtime_preview_path, ra_dark_runtime_preview_path)
 
-communication_score <- read.csv(sc_app_path("CellChat_all_stage_communication_score_LR_reverse.csv", app_dir = app_dir))
+# ---------------------------------------------------------------------------
+# Cell-cell communication heatmap preview
+# ---------------------------------------------------------------------------
+communication_score <- read.csv(sc_first_existing(sc_data_candidates("CellChat_all_stage_communication_score_LR_reverse.csv"), app_dir = app_dir))
 if (!("lr_pair" %in% names(communication_score))) {
   if ("X" %in% names(communication_score)) {
     communication_score$lr_pair <- communication_score$X
@@ -346,16 +380,20 @@ if (!length(selected_pairs)) {
 }
 selected_pairs <- head(selected_pairs, 10)
 
+# Render a small representative LR-pair heatmap for the home card. The dark
+# variant uses a separate theme instead of post-processing the light image.
 make_fig6d_preview <- function(df, selection, dark_theme = FALSE) {
-  filtered <- df[df$lr_pair %in% selection,
-                 c("lr_pair", "X_DARK_score", "X_PALE_score", "X_PALE2WEAK_score", "X_WEAK2STRONG_score")]
+  filtered <- df[
+    df$lr_pair %in% selection,
+    c("lr_pair", "X_DARK_score", "X_PALE_score", "X_PALE2WEAK_score", "X_WEAK2STRONG_score")
+  ]
   if (!nrow(filtered)) {
     stop("No rows available for selected LR pairs.")
   }
   mat <- as.matrix(filtered[, -1])
   rownames(mat) <- filtered$lr_pair
   colnames(mat) <- c("I-VI", "VII-VIII", "IX-X", "XI-XII")
-  
+
   df_long <- reshape2::melt(mat, varnames = c("lr_pair", "stage"), value.name = "score")
   df_long$stage <- factor(df_long$stage, levels = c("I-VI", "VII-VIII", "IX-X", "XI-XII"))
 
@@ -370,8 +408,8 @@ make_fig6d_preview <- function(df, selection, dark_theme = FALSE) {
       name = "Score"
     )
   }
-  
-  ggplot(df_long, aes(x = stage, y = lr_pair, fill = score)) +
+
+  return(ggplot(df_long, aes(x = stage, y = lr_pair, fill = score)) +
     geom_tile() +
     fill_scale +
     labs(x = "Stage", y = "Ligand–Receptor Pair") +
@@ -388,7 +426,7 @@ make_fig6d_preview <- function(df, selection, dark_theme = FALSE) {
       legend.text = element_text(color = axis_col),
       legend.title = element_text(color = axis_col),
       plot.margin = unit(c(0.5, 0.6, 0.5, 1.2), "lines")
-    )
+    ))
 }
 
 heatmap_light_plot <- make_fig6d_preview(communication_score, selected_pairs, dark_theme = FALSE)
@@ -401,6 +439,9 @@ ggsave(heatmap_dark_source_path, heatmap_dark_plot, width = 5.4, height = 3.4, d
 write_runtime_preview(heatmap_light_source_path, heatmap_path)
 write_runtime_preview(heatmap_dark_source_path, heatmap_dark_path)
 
+# ---------------------------------------------------------------------------
+# Spermatogenesis table preview
+# ---------------------------------------------------------------------------
 if (!file.exists(interactive_table_source_path)) {
   stop(sprintf("Expected interactive table source image at %s", interactive_table_source_path))
 }

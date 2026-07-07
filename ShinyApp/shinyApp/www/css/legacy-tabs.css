@@ -1,4 +1,15 @@
+/* ---------------------------------------------------------------------------
+   Dataset and interactive figure tab surfaces
+   ---------------------------------------------------------------------------
+   Styles the reusable tab builders in dataset_tab_builders.R plus the RA,
+   CellChat, download, explanation, and legacy ShinyCell card layouts.
+*/
+
 /* ===== Global Quicksand Typography ===== */
+
+:root {
+  --app-font: "Quicksand", "Segoe UI", roboto, helvetica, arial, sans-serif;
+}
 
 /* Base body text */
 body, 
@@ -6,7 +17,7 @@ html,
 .shiny-app, 
 .container-fluid, 
 .tab-content {
-  font-family: "Quicksand", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: Quicksand, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-weight: 400;  /* Regular Quicksand */
   letter-spacing: 0.2px;
   line-height: 1.5;
@@ -14,13 +25,19 @@ html,
 
 /* Headings */
 h1, .hdr-title {
+  font-family: var(--app-font) !important;
   font-weight: 700;   /* Bold Quicksand */
   letter-spacing: 0.3px;
 }
 
 h2, h3, h4 {
+  font-family: var(--app-font) !important;
   font-weight: 600;   /* Semi-bold Quicksand */
   letter-spacing: 0.25px;
+}
+
+h5, h6 {
+  font-family: var(--app-font) !important;
 }
 
 /* Subtitles, muted labels */
@@ -41,21 +58,8 @@ small,
   letter-spacing: 0.25px;
 }
 
-/* Force Quicksand on headings (overrides Bootstrap's Montserrat) */
-:root { --app-font: "Quicksand", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+/* -------------------------- */
 
-.hdr-title,
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--app-font) !important;
-}
-
-/* Keep our intended weights */
-.hdr-title, h1 { font-weight: 700; letter-spacing: 0.3px; }
-h2, h3, h4     { font-weight: 600; letter-spacing: 0.25px; }
-
-
-
-/*--------------------------*/
 /* === Card Stack consistent spacing === */
 
 /* Header bottom spacing */
@@ -102,20 +106,22 @@ h2, h3, h4     { font-weight: 600; letter-spacing: 0.25px; }
 }
 
 /* Match card heights cleanly instead of mixing sticky/scrolling behavior. */
-.ra-controls{ position: static; top: auto; }
+.ra-controls{
+  position: static;
+  top: auto;
+}
 
-/* shared glass card look (uses your glass vars) */
+/* Shared glass-card treatment for analysis panels. */
 .glass-card{
   border-radius: 16px;
   background: linear-gradient(180deg, var(--glass-top), var(--glass-bot));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   background-size: 200% 200%;
-  animation: gradientFlow 38s ease-in-out infinite alternate;
-  border: 1px solid rgba(15,23,42,0.08);
+  animation: gradient-flow 38s ease-in-out infinite alternate;
+  border: 1px solid rgb(15 23 42 / 8%);
   box-shadow:
-    0 10px 30px rgba(16,24,40,.08),
-    0 1px 0 rgba(16,24,40,.04) inset;
+    0 10px 30px rgb(16 24 40 / 8%),
+    0 1px 0 rgb(16 24 40 / 4%) inset;
   padding: 16px 16px 18px;
 }
 
@@ -124,13 +130,13 @@ html[data-theme='dark'] .panel,
 html[data-theme='dark'] .well,
 html[data-theme='dark'] .box,
 html[data-theme='dark'] .shiny-input-container{
-  background: linear-gradient(180deg, rgba(15,22,45,.95), rgba(7,12,24,.94));
+  background: linear-gradient(180deg, rgb(15 22 45 / 95%), rgb(7 12 24 / 94%));
   background-size: 200% 200%;
-  animation: gradientFlow 38s ease-in-out infinite alternate;
+  animation: gradient-flow 38s ease-in-out infinite alternate;
   border: 1px solid var(--color-control-border);
   box-shadow:
-    0 22px 44px rgba(2,6,23,.8),
-    0 1px 0 rgba(37,56,116,.35) inset;
+    0 22px 44px rgb(2 6 23 / 80%),
+    0 1px 0 rgb(37 56 116 / 35%) inset;
 }
 
 /* card header */
@@ -141,30 +147,36 @@ html[data-theme='dark'] .shiny-input-container{
   flex-direction: column;
   gap: 8px;
 }
+
 .ra-head-main{
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .ra-head-main .btn{
   white-space: nowrap;
 }
+
 .ra-head-main .ra-btn{
   padding: 4px 12px;
   font-size: 0.85rem;
   line-height: 1.3;
   border-radius: 8px;
 }
+
 .ra-head-main .ra-title{
   margin: 0;
 }
+
 .ra-sidebar-action-row{
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: nowrap;
 }
+
 .ra-sidebar-action-row .btn{
   margin: 0;
   display: inline-flex;
@@ -173,6 +185,7 @@ html[data-theme='dark'] .shiny-input-container{
   flex: 1 1 0;
   min-width: 0;
 }
+
 .ra-card-download{
   position: absolute;
   top: 18px;
@@ -191,40 +204,46 @@ html[data-theme='dark'] .shiny-input-container{
   white-space: nowrap;
   letter-spacing: 0;
 }
+
 .ra-card-download .btn{
   margin: 0;
 }
+
 .ra-download-btn{
-  background: rgba(255,255,255,0.9);
+  background: rgb(255 255 255 / 90%);
   color: var(--hdr-fg, #0f172a);
-  border: 1px solid rgba(15,23,42,0.12);
+  border: 1px solid rgb(15 23 42 / 12%);
   border-radius: 999px;
   padding: 6px 16px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  box-shadow: 0 14px 30px rgba(15,23,42,0.12);
+  box-shadow: 0 14px 30px rgb(15 23 42 / 12%);
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+
 .ra-download-btn:hover,
 .ra-download-btn:focus{
-  background: rgba(255,255,255,0.98);
-  border-color: rgba(15,23,42,0.2);
-  box-shadow: 0 18px 36px rgba(15,23,42,0.16);
+  background: rgb(255 255 255 / 98%);
+  border-color: rgb(15 23 42 / 20%);
+  box-shadow: 0 18px 36px rgb(15 23 42 / 16%);
   color: var(--hdr-fg, #0f172a);
 }
+
 html[data-theme='dark'] .ra-download-btn{
-  background: rgba(9,15,32,0.92);
+  background: rgb(9 15 32 / 92%);
   border-color: var(--color-control-border);
   color: var(--color-text);
-  box-shadow: 0 18px 40px rgba(2,6,23,0.85);
+  box-shadow: 0 18px 40px rgb(2 6 23 / 85%);
 }
+
 html[data-theme='dark'] .ra-download-btn:hover,
 html[data-theme='dark'] .ra-download-btn:focus{
-  background: rgba(17,27,54,0.95);
+  background: rgb(17 27 54 / 95%);
   border-color: var(--color-control-border-strong);
-  box-shadow: 0 24px 48px rgba(2,6,23,0.9);
+  box-shadow: 0 24px 48px rgb(2 6 23 / 90%);
 }
-@media (max-width: 700px){
+
+@media (width <= 700px){
   .ra-card-download{
     position: static;
     justify-content: flex-end;
@@ -235,20 +254,22 @@ html[data-theme='dark'] .ra-download-btn:focus{
 /* Figure containers */
 .shiny-plot-output{
   position: relative;
-  background-color: var(--plot-holder-bg, #ffffff);
+  background-color: var(--plot-holder-bg, #fff);
   border-radius: 12px;
-  border: 1px solid var(--plot-holder-border, rgba(15,23,42,0.05));
+  border: 1px solid var(--plot-holder-border, rgb(15 23 42 / 5%));
   transition: background-color 0.25s ease, border-color 0.25s ease;
   overflow: hidden;
 }
+
 .shiny-plot-output > img{
   border-radius: 12px;
   width: 100% !important;
   height: 100% !important;
   object-fit: contain;
   display: block;
-  background-color: var(--plot-holder-bg, #ffffff) !important;
+  background-color: var(--plot-holder-bg, #fff) !important;
 }
+
 html[data-theme='dark'] .shiny-plot-output,
 html[data-theme='dark'] .shiny-plot-output > img,
 html[data-theme='dark'] .plotly,
@@ -257,7 +278,7 @@ html[data-theme='dark'] .heatmaply,
 html[data-theme='dark'] #spermatogonia_container {
   filter: none;
   background-color: var(--plot-holder-bg, #050815) !important;
-  border: 1px solid var(--plot-holder-border, rgba(148, 163, 184, 0.3));
+  border: 1px solid var(--plot-holder-border, rgb(148 163 184 / 30%));
   border-radius: 12px;
   color: var(--color-text);
 }
@@ -292,7 +313,7 @@ html[data-theme='dark'] #spermatogonia_container {
     radial-gradient(circle at 50% 80%, var(--aurora-c), transparent 75%);
   mix-blend-mode: screen;
   pointer-events: none;
-  animation: auroraDrift 18s ease-in-out infinite;
+  animation: aurora-drift 18s ease-in-out infinite;
   opacity: 0.32;
   z-index: 0;
 }
@@ -301,26 +322,26 @@ html[data-theme='dark'] #spermatogonia_container,
 html[data-theme='dark'] #ra_dotplot_container,
 html[data-theme='dark'] #ra_lineplot_container,
 html[data-theme='dark'] #ccc_heatmap_container {
-  background: linear-gradient(180deg, rgba(5, 8, 20, 0.94), rgba(10, 12, 24, 0.9)) !important;
+  background: linear-gradient(180deg, rgb(5 8 20 / 94%), rgb(10 12 24 / 90%)) !important;
   background-size: 220% 220%;
-  animation: gradientFlow 26s ease-in-out infinite alternate;
-  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  animation: gradient-flow 26s ease-in-out infinite alternate;
+  border: 1px solid rgb(148 163 184 / 20%) !important;
   box-shadow:
-    inset 0 0 0 1px rgba(15, 23, 42, 0.25),
-    0 24px 48px rgba(2, 6, 23, 0.55);
+    inset 0 0 0 1px rgb(15 23 42 / 25%),
+    0 24px 48px rgb(2 6 23 / 55%);
 }
 
 html[data-theme='lightblue'] #spermatogonia_container,
 html[data-theme='lightblue'] #ra_dotplot_container,
 html[data-theme='lightblue'] #ra_lineplot_container,
 html[data-theme='lightblue'] #ccc_heatmap_container {
-  background: linear-gradient(180deg, rgba(224, 244, 255, 0.95), rgba(200, 230, 255, 0.92)) !important;
+  background: linear-gradient(180deg, rgb(224 244 255 / 95%), rgb(200 230 255 / 92%)) !important;
   background-size: 220% 220%;
-  animation: gradientFlow 26s ease-in-out infinite alternate;
-  border: 1px solid rgba(74, 144, 226, 0.22) !important;
+  animation: gradient-flow 26s ease-in-out infinite alternate;
+  border: 1px solid rgb(74 144 226 / 22%) !important;
   box-shadow:
-    inset 0 0 0 1px rgba(74, 144, 226, 0.15),
-    0 18px 36px rgba(15, 23, 42, 0.16);
+    inset 0 0 0 1px rgb(74 144 226 / 15%),
+    0 18px 36px rgb(15 23 42 / 16%);
 }
 
 html[data-theme='dark'] #spermatogonia_container::after,
@@ -338,6 +359,7 @@ html[data-theme='lightblue'] #ccc_heatmap_container::after {
   opacity: 0.25;
   mix-blend-mode: soft-light;
 }
+
 .ra-title{
   margin: 0;
   font-weight: 700;
@@ -346,6 +368,7 @@ html[data-theme='lightblue'] #ccc_heatmap_container::after {
   color: var(--hdr-fg, #0f172a);
   position: relative;
 }
+
 .ra-title::after{
   content:"";
   position:absolute; left:0; bottom:-8px;
@@ -353,8 +376,9 @@ html[data-theme='lightblue'] #ccc_heatmap_container::after {
   background: linear-gradient(90deg, var(--hdr-grad-a,#7c3aed), var(--hdr-grad-b,#06b6d4));
   opacity:.85;
 }
+
 .ra-sub{
-  margin: 10px 0 0 0;
+  margin: 10px 0 0;
   font-size: 0.95rem;
   color: var(--hdr-fg-sub, #5b6475);
   font-weight: 500;
@@ -362,6 +386,7 @@ html[data-theme='lightblue'] #ccc_heatmap_container::after {
 
 /* fields */
 .ra-field{ margin-top: 14px; }
+
 .ra-label{
   display:block;
   font-weight: 600;
@@ -374,12 +399,13 @@ html[data-theme='lightblue'] #ccc_heatmap_container::after {
 .selectize-control .selectize-input{
   border-radius: 12px;
   padding: 10px 12px;
-  border: 1px solid rgba(15,23,42,.15);
-  box-shadow: 0 1px 0 rgba(16,24,40,.04) inset;
+  border: 1px solid rgb(15 23 42 / 15%);
+  box-shadow: 0 1px 0 rgb(16 24 40 / 4%) inset;
 }
+
 .selectize-control .selectize-input.focus{
-  border-color: rgba(79,70,229,.55); /* indigo-ish */
-  box-shadow: 0 0 0 3px rgba(79,70,229,.15);
+  border-color: rgb(79 70 229 / 55%); /* indigo-ish */
+  box-shadow: 0 0 0 3px rgb(79 70 229 / 15%);
 }
 
 html[data-theme='dark'] .selectize-control .selectize-input,
@@ -387,7 +413,7 @@ html[data-theme='dark'] .selectize-dropdown {
   background-color: var(--color-control-bg);
   border-color: var(--color-control-border);
   color: var(--color-text);
-  box-shadow: 0 1px 0 rgba(2,6,23,.45) inset, 0 18px 32px rgba(1,5,15,.7);
+  box-shadow: 0 1px 0 rgb(2 6 23 / 45%) inset, 0 18px 32px rgb(1 5 15 / 70%);
 }
 
 html[data-theme='dark'] .selectize-control .selectize-input input {
@@ -401,18 +427,18 @@ html[data-theme='dark'] .selectize-dropdown .option {
 html[data-theme='dark'] .selectize-control .selectize-input.focus,
 html[data-theme='dark'] .selectize-control .selectize-input.dropdown-active {
   border-color: var(--color-control-border-strong);
-  box-shadow: 0 0 0 3px var(--color-control-border-strong), 0 1px 0 rgba(2,6,23,.45) inset;
+  box-shadow: 0 0 0 3px var(--color-control-border-strong), 0 1px 0 rgb(2 6 23 / 45%) inset;
 }
 
 html[data-theme='dark'] .selectize-dropdown .active {
-  background-color: rgba(35,56,116,.75);
+  background-color: rgb(35 56 116 / 75%);
   color: #f8fafc;
 }
 
 html[data-theme='dark'] .selectize-control.multi .selectize-input > .item,
 html[data-theme='dark'] .selectize-control.multi .selectize-input > div {
-  background: #000000 !important;
-  color: #ffffff !important;
+  background: #000 !important;
+  color: #fff !important;
   border: 1px solid #1f2937 !important;
   text-shadow: none !important;
   box-shadow: none !important;
@@ -420,7 +446,7 @@ html[data-theme='dark'] .selectize-control.multi .selectize-input > div {
 
 html[data-theme='dark'] .selectize-control.multi .selectize-input > .item .remove,
 html[data-theme='dark'] .selectize-control.multi .selectize-input > div .remove {
-  color: #ffffff !important;
+  color: #fff !important;
   border-left: 1px solid #1f2937 !important;
 }
 
@@ -430,9 +456,9 @@ html[data-theme='dark'] .selectize-control.multi .selectize-input > div .remove 
   grid-template-columns: 1fr 1fr;  /* two equal columns */
   gap: 8px 16px;                   /* vertical gap 8px, horizontal gap 16px */
   padding: 10px 12px;
-  border: 1px solid rgba(15,23,42,.08);
+  border: 1px solid rgb(15 23 42 / 8%);
   border-radius: 12px;
-  background: rgba(255,255,255,.45);
+  background: rgb(255 255 255 / 45%);
 }
 
 .ra-card .checkbox{
@@ -442,9 +468,9 @@ html[data-theme='dark'] .selectize-control.multi .selectize-input > div .remove 
 
 html[data-theme='dark'] .ra-card .shiny-options-group,
 html[data-theme='dark'] .ra-rowgroup{
-  background: rgba(14,16,24,0.85);
-  border-color: rgba(255,255,255,.08);
-  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset;
+  background: rgb(14 16 24 / 85%);
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 4%) inset;
 }
 
 /* keep plot area breathing nicely */
@@ -453,10 +479,10 @@ html[data-theme='dark'] .ra-rowgroup{
 /* Subtle grouped sections for the three rows */
 .ra-rowgroup{
   padding: 10px 12px 12px;
-  border: 1px solid rgba(15,23,42,.08);
+  border: 1px solid rgb(15 23 42 / 8%);
   border-radius: 12px;
-  background: rgba(255,255,255,.45);
-  box-shadow: 0 1px 0 rgba(16,24,40,.04) inset;
+  background: rgb(255 255 255 / 45%);
+  box-shadow: 0 1px 0 rgb(16 24 40 / 4%) inset;
   margin-top: 12px;
 }
 
@@ -473,7 +499,7 @@ html[data-theme='dark'] .ra-sub{
 }
 
 /* Optional: on narrow screens, stack like DotPlot page */
-@media (max-width: 899px){
+@media (width <= 899px){
   .ra-controls{ position: static; }
   .ra-pane{ grid-template-columns: 1fr; }
 }
@@ -493,7 +519,7 @@ html[data-theme='dark'] .ra-sub{
 }
 
 /* Responsive: stack like the other pages */
-@media (max-width: 899px){
+@media (width <= 899px){
   .ra-controls{ position: static; }
   .ra-pane{ grid-template-columns: 1fr; }
 }
@@ -556,13 +582,12 @@ html[data-theme='dark'] .ra-sub{
   width: 100%;
   padding: 8px 10px 6px;
   border-radius: 16px;
-  border: 1px solid rgba(15,23,42,0.10);
-  background: #ffffff;
-  -webkit-backdrop-filter: none;
+  border: 1px solid rgb(15 23 42 / 10%);
+  background: #fff;
   backdrop-filter: none;
   box-shadow:
-    0 10px 24px rgba(16,24,40,0.08),
-    0 1px 0 rgba(16,24,40,0.03) inset;
+    0 10px 24px rgb(16 24 40 / 8%),
+    0 1px 0 rgb(16 24 40 / 3%) inset;
 }
 
 .subset-secondary-nav-inner{
@@ -606,8 +631,8 @@ html[data-theme='dark'] .ra-sub{
 
 .subset-secondary-link:hover,
 .subset-secondary-link:focus{
-  background: rgba(15,23,42,0.04);
-  border-color: rgba(15,23,42,0.08);
+  background: rgb(15 23 42 / 4%);
+  border-color: rgb(15 23 42 / 8%);
   color: var(--hdr-fg, #0f172a);
   text-decoration: none;
   outline: none;
@@ -624,11 +649,11 @@ html[data-theme='dark'] .ra-sub{
 }
 
 html[data-theme='dark'] .subset-secondary-nav{
-  background: linear-gradient(180deg, rgba(15,23,42,0.96), rgba(7,11,24,0.94));
-  border-color: rgba(99,102,241,0.34);
+  background: linear-gradient(180deg, rgb(15 23 42 / 96%), rgb(7 11 24 / 94%));
+  border-color: rgb(99 102 241 / 34%);
   box-shadow:
-    0 18px 38px rgba(2,6,23,0.68),
-    0 1px 0 rgba(255,255,255,0.06) inset;
+    0 18px 38px rgb(2 6 23 / 68%),
+    0 1px 0 rgb(255 255 255 / 6%) inset;
 }
 
 html[data-theme='dark'] .subset-secondary-link{
@@ -637,18 +662,18 @@ html[data-theme='dark'] .subset-secondary-link{
 
 html[data-theme='dark'] .subset-secondary-link:hover,
 html[data-theme='dark'] .subset-secondary-link:focus{
-  background: rgba(59,130,246,0.16);
-  border-color: rgba(99,102,241,0.34);
-  color: #ffffff;
+  background: rgb(59 130 246 / 16%);
+  border-color: rgb(99 102 241 / 34%);
+  color: #fff;
 }
 
 html[data-theme='dark'] .subset-secondary-link.is-active{
-  background: rgba(20,184,166,0.10);
-  border-color: rgba(20,184,166,0.22);
-  color: #ffffff;
+  background: rgb(20 184 166 / 10%);
+  border-color: rgb(20 184 166 / 22%);
+  color: #fff;
 }
 
-@media (max-width: 700px){
+@media (width <= 700px){
   .subset-secondary-nav{
     padding: 6px;
     overflow-x: auto;
@@ -678,6 +703,7 @@ html[data-theme='dark'] .subset-secondary-link.is-active{
 
 .legacy-advanced .ra-rowgroup{
   flex: 1 1 280px;
+  margin: 0;
   padding: 12px 14px 16px;
   display: flex;
   flex-direction: column;
@@ -730,11 +756,12 @@ html[data-theme='dark'] .subset-secondary-link.is-active{
   top: auto;
 }
 
-@media (max-width: 600px){
+@media (width <= 600px){
   .legacy-advanced-body{
     flex-direction: column;
     gap: 12px;
   }
+
   .legacy-advanced .ra-rowgroup{
     flex: 1 1 100%;
   }
@@ -752,7 +779,7 @@ html[data-theme='dark'] .subset-secondary-link.is-active{
   margin-right: 0;
 }
 
-@media (max-width: 899px){
+@media (width <= 899px){
   .legacy-pane{
     grid-template-columns: 1fr;
   }
@@ -767,10 +794,6 @@ html[data-theme='dark'] .subset-secondary-link.is-active{
   margin-top: 14px;
 }
 
-.legacy-advanced .ra-rowgroup{
-  margin: 0;
-}
-
 .legacy-advanced-two-col .legacy-advanced-body{
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -782,18 +805,18 @@ html[data-theme='dark'] .subset-secondary-link.is-active{
   width: 100%;
   flex: none;
   padding: 12px 14px 16px;
-  background: rgba(255,255,255,0.65);
-  border: 1px solid rgba(15,23,42,.09);
-  box-shadow: 0 10px 24px rgba(15,23,42,.05);
+  background: rgb(255 255 255 / 65%);
+  border: 1px solid rgb(15 23 42 / 9%);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 5%);
 }
 
 html[data-theme='dark'] .legacy-advanced-two-col .ra-rowgroup{
-  background: rgba(14,16,24,0.9);
-  border-color: rgba(255,255,255,.08);
-  box-shadow: 0 12px 28px rgba(0,0,0,.35);
+  background: rgb(14 16 24 / 90%);
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
 }
 
-@media (max-width: 600px){
+@media (width <= 600px){
   .legacy-advanced-two-col .legacy-advanced-body{
     grid-template-columns: 1fr;
     gap: 12px;
@@ -885,7 +908,7 @@ html[data-theme='dark'] .legacy-advanced-two-col .ra-rowgroup{
 
 .ra-subtext{
   margin: 4px 0 2px;
-  color: rgba(15,23,42,0.75);
+  color: rgb(15 23 42 / 75%);
   font-size: 0.95rem;
 }
 
@@ -923,18 +946,18 @@ html[data-theme='dark'] .legacy-advanced-two-col .ra-rowgroup{
 }
 
 .ra-plot-holder{
-  background: var(--plot-holder-bg, #ffffff);
+  background: var(--plot-holder-bg, #fff);
   padding: 12px;
   border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(15,23,42,0.06);
-  border: 1px solid var(--plot-holder-border, rgba(15,23,42,0.05));
+  box-shadow: 0 12px 30px rgb(15 23 42 / 6%);
+  border: 1px solid var(--plot-holder-border, rgb(15 23 42 / 5%));
   min-height: var(--plot-min-height, 520px);
 }
 
 html[data-theme='dark'] .ra-plot-holder{
   background: var(--plot-holder-bg, var(--color-surface-card-raised, #141f3f));
   border: 1px solid var(--plot-holder-border, var(--color-control-border));
-  box-shadow: 0 26px 46px rgba(2,6,23,0.85);
+  box-shadow: 0 26px 46px rgb(2 6 23 / 85%);
 }
 
 .ra-card.ra-plot{
@@ -990,7 +1013,7 @@ html[data-theme='dark'] .ra-plot-holder{
 .ra-download-entry + .ra-download-entry{
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid rgba(15,23,42,0.08);
+  border-top: 1px solid rgb(15 23 42 / 8%);
 }
 
 .ra-download-entry-title{
@@ -1041,7 +1064,7 @@ html[data-theme='dark'] .ra-plot-holder{
 }
 
 html[data-theme='dark'] .ra-download-entry + .ra-download-entry{
-  border-top-color: rgba(148, 163, 184, 0.2);
+  border-top-color: rgb(148 163 184 / 20%);
 }
 
 html[data-theme='dark'] .ra-download-entry-title{
@@ -1088,8 +1111,8 @@ html[data-theme='dark'] .ra-download-entry-title{
   border-radius: 999px;
   font-weight: 600;
   color: #1f3b66;
-  background: rgba(79, 70, 229, 0.12);
-  border: 1px solid rgba(79, 70, 229, 0.35);
+  background: rgb(79 70 229 / 12%);
+  border: 1px solid rgb(79 70 229 / 35%);
 }
 
 .figure-expl-details > summary::-webkit-details-marker{
@@ -1110,17 +1133,17 @@ html[data-theme='dark'] .ra-download-entry-title{
 
 html[data-theme='dark'] .figure-expl-details > summary{
   color: #e2ecff;
-  background: rgba(129, 140, 248, 0.18);
-  border-color: rgba(129, 140, 248, 0.45);
+  background: rgb(129 140 248 / 18%);
+  border-color: rgb(129 140 248 / 45%);
 }
 
 html[data-theme='dark'] .figure-expl-details > summary:hover,
 html[data-theme='dark'] .figure-expl-details > summary:focus-visible{
-  background: rgba(129, 140, 248, 0.26);
+  background: rgb(129 140 248 / 26%);
 }
 
 html[data-theme='lightblue'] .figure-expl-details > summary:hover,
 .figure-expl-details > summary:hover,
 .figure-expl-details > summary:focus-visible{
-  background: rgba(79, 70, 229, 0.18);
+  background: rgb(79 70 229 / 18%);
 }

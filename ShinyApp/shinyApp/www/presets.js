@@ -1,4 +1,11 @@
+// ---------------------------------------------------------------------------
+// Preset/share-link clipboard helper
+// ---------------------------------------------------------------------------
+// Receives Shiny custom messages that ask the browser to copy a shareable link.
+// Uses the modern Clipboard API when available and falls back to a temporary
+// textarea for older browser contexts.
 ;(function() {
+  // Fallback path for browsers or permissions contexts without navigator.clipboard.
   function fallbackCopy(text) {
     var textarea = document.createElement("textarea");
     textarea.value = text;
@@ -15,12 +22,14 @@
     document.body.removeChild(textarea);
   }
 
+  // Notify Shiny so the server can display a consistent copy-status message.
   function notify(message) {
     if (window.Shiny && typeof Shiny.setInputValue === "function") {
       Shiny.setInputValue("preset_copy_notice", { time: Date.now(), message: message }, { priority: "event" });
     }
   }
 
+  // Main message bridge from server.R share-link workflows.
   Shiny.addCustomMessageHandler("copy-to-clipboard", function(payload) {
     var text = payload && payload.text;
     if (!text) { return; }

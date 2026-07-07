@@ -1,14 +1,26 @@
+# ---------------------------------------------------------------------------
+# SpermInteractive shared support helpers
+# ---------------------------------------------------------------------------
+# This file is sourced by the app runtime and by build/maintenance scripts. Keep
+# helpers here free of Shiny session state so scripts can reuse path discovery,
+# lazy loading, and data-root conventions without sourcing ui.R or server.R.
+
+# ---------------------------------------------------------------------------
+# Small value and path predicates
+# ---------------------------------------------------------------------------
 sc_default <- function(value, fallback) {
   if (is.null(value) || length(value) == 0 || all(is.na(value))) {
     return(fallback)
   }
-  value
+  return(value)
 }
 
 sc_is_absolute_path <- function(path) {
-  grepl("^(/|~|[A-Za-z]:[/\\\\])", path)
+  return(grepl("^(/|~|[A-Za-z]:[/\\\\])", path))
 }
 
+# Resolve the directory of the currently executing script when Rscript supplies
+# --file=..., with a working-directory fallback for interactive sessions.
 sc_script_dir <- function(default = getwd()) {
   args <- commandArgs(trailingOnly = FALSE)
   file_arg <- grep("^--file=", args, value = TRUE)
@@ -21,17 +33,25 @@ sc_script_dir <- function(default = getwd()) {
     return(dirname(normalizePath(frame_path, mustWork = FALSE)))
   }
 
-  normalizePath(default, mustWork = FALSE)
+  return(normalizePath(default, mustWork = FALSE))
 }
 
+# ---------------------------------------------------------------------------
+# App-root discovery
+# ---------------------------------------------------------------------------
+# The app root is identified by the runtime entrypoints plus the tab-builder
+# module. This avoids accidentally treating repo root or a scripts/ folder as
+# the Shiny application directory.
 sc_is_app_dir <- function(path) {
-  dir.exists(path) &&
+  return(dir.exists(path) &&
     file.exists(file.path(path, "ui.R")) &&
     file.exists(file.path(path, "server.R")) &&
-    file.exists(file.path(path, "ra_tabs.R")) &&
-    dir.exists(file.path(path, "www"))
+    file.exists(file.path(path, "dataset_tab_builders.R")) &&
+    dir.exists(file.path(path, "www")))
 }
 
+# Walk upward from a script or working directory and also check the repo's
+# conventional ShinyApp/shinyApp child path.
 sc_find_app_dir <- function(start = getwd()) {
   if (!dir.exists(start) && file.exists(start)) {
     start <- dirname(start)
@@ -66,10 +86,11 @@ sc_find_app_dir <- function(start = getwd()) {
   )
 }
 
+# Cache the app root in an option so repeated helper calls do not rediscover it.
 sc_set_app_dir <- function(path) {
   normalized <- normalizePath(path, mustWork = FALSE)
   options(sperminteractive.app_dir = normalized)
-  invisible(normalized)
+  return(invisible(normalized))
 }
 
 sc_get_app_dir <- function(start = NULL, refresh = FALSE) {
@@ -79,9 +100,14 @@ sc_get_app_dir <- function(start = NULL, refresh = FALSE) {
   }
 
   app_dir <- sc_find_app_dir(sc_default(start, getwd()))
-  sc_set_app_dir(app_dir)
+  return(sc_set_app_dir(app_dir))
 }
 
+# ---------------------------------------------------------------------------
+# App-relative path helpers
+# ---------------------------------------------------------------------------
+# Candidate paths are resolved both as supplied and relative to the app root so
+# scripts can be launched from repo root, app root, or their own folder.
 sc_resolve_paths <- function(paths, app_dir = sc_get_app_dir()) {
   resolved <- character(0)
   for (path in paths) {
@@ -101,9 +127,11 @@ sc_resolve_paths <- function(paths, app_dir = sc_get_app_dir()) {
     )
   }
 
-  unique(resolved)
+  return(unique(resolved))
 }
 
+# Return the first real file or directory from a candidate list. This keeps
+# fallback ordering explicit at call sites while centralizing the error message.
 sc_first_existing <- function(paths, app_dir = sc_get_app_dir()) {
   resolved <- sc_resolve_paths(paths, app_dir = app_dir)
   existing <- resolved[file.exists(resolved) | dir.exists(resolved)]
@@ -113,17 +141,56 @@ sc_first_existing <- function(paths, app_dir = sc_get_app_dir()) {
       call. = FALSE
     )
   }
-  existing[[1]]
+  return(existing[[1]])
 }
 
 sc_app_path <- function(..., app_dir = sc_get_app_dir()) {
-  normalizePath(file.path(app_dir, ...), mustWork = FALSE)
+  return(normalizePath(file.path(app_dir, ...), mustWork = FALSE))
 }
 
 sc_www_path <- function(..., app_dir = sc_get_app_dir()) {
-  sc_app_path("www", ..., app_dir = app_dir)
+  return(sc_app_path("www", ..., app_dir = app_dir))
 }
 
+# Data assets live outside www/ so they can be loaded by R without exposing them
+# as static browser-downloadable files.
+sc_data_path <- function(..., app_dir = sc_get_app_dir()) {
+  return(sc_app_path("Data", ..., app_dir = app_dir))
+}
+
+sc_data_dir <- function(app_dir = sc_get_app_dir(), create = FALSE) {
+  path <- sc_data_path(app_dir = app_dir)
+  if (isTRUE(create) && !dir.exists(path)) {
+    dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  }
+  return(path)
+}
+
+# Prefer Data/ assets while retaining legacy app-root fallbacks during the
+# migration away from loose runtime files.
+sc_data_candidates <- function(paths, include_legacy = TRUE) {
+  candidates <- character(0)
+  for (path in paths) {
+    if (is.null(path) || is.na(path) || !nzchar(path)) {
+      next
+    }
+
+    if (sc_is_absolute_path(path) || startsWith(path, "Data/") || startsWith(path, "Data\\")) {
+      candidates <- c(candidates, path)
+      next
+    }
+
+    candidates <- c(candidates, file.path("Data", path))
+    if (isTRUE(include_legacy)) {
+      candidates <- c(candidates, path)
+    }
+  }
+  return(unique(candidates))
+}
+
+# ---------------------------------------------------------------------------
+# Spinner wrappers
+# ---------------------------------------------------------------------------
 # Central loading spinner definition shared by every slow plot/figure output.
 sc_spinner_config <- function(overrides = list()) {
   base <- list(
@@ -131,7 +198,7 @@ sc_spinner_config <- function(overrides = list()) {
     color = getOption("sperminteractive.spinner.color", "#4F46E5"),
     color.background = getOption("sperminteractive.spinner.background", "transparent")
   )
-  utils::modifyList(base, overrides)
+  return(utils::modifyList(base, overrides))
 }
 
 sc_with_spinner <- function(ui, proxy.height = NULL, ...) {
@@ -140,7 +207,7 @@ sc_with_spinner <- function(ui, proxy.height = NULL, ...) {
     spinner_args$proxy.height <- proxy.height
   }
   spinner_args <- c(list(ui), spinner_args)
-  do.call(shinycssloaders::withSpinner, spinner_args)
+  return(do.call(shinycssloaders::withSpinner, spinner_args))
 }
 
 sc_spinner_plot_output <- function(output_id,
@@ -148,11 +215,11 @@ sc_spinner_plot_output <- function(output_id,
                                    width = "100%",
                                    proxy.height = NULL,
                                    ...) {
-  sc_with_spinner(
+  return(sc_with_spinner(
     shiny::plotOutput(output_id, height = height, width = width),
     proxy.height = sc_default(proxy.height, height),
     ...
-  )
+  ))
 }
 
 sc_spinner_plotly_output <- function(output_id,
@@ -160,21 +227,26 @@ sc_spinner_plotly_output <- function(output_id,
                                      width = "100%",
                                      proxy.height = NULL,
                                      ...) {
-  sc_with_spinner(
+  return(sc_with_spinner(
     plotly::plotlyOutput(output_id, height = height, width = width),
     proxy.height = sc_default(proxy.height, height),
     ...
-  )
+  ))
 }
 
 sc_spinner_ui_output <- function(output_id, proxy.height = NULL, ...) {
-  sc_with_spinner(
+  return(sc_with_spinner(
     shiny::uiOutput(output_id),
     proxy.height = proxy.height,
     ...
-  )
+  ))
 }
 
+# ---------------------------------------------------------------------------
+# Script and lazy-loading helpers
+# ---------------------------------------------------------------------------
+# Normalize user-provided output directories against the app root. Existing
+# relative directories win over speculative app-relative paths.
 sc_dir_arg <- function(path, app_dir = sc_get_app_dir()) {
   if (is.null(path) || is.na(path) || !nzchar(path)) {
     return(normalizePath(app_dir, mustWork = FALSE))
@@ -189,34 +261,44 @@ sc_dir_arg <- function(path, app_dir = sc_get_app_dir()) {
     return(existing_dirs[[1]])
   }
 
-  normalizePath(file.path(app_dir, path), mustWork = FALSE)
+  return(normalizePath(file.path(app_dir, path), mustWork = FALSE))
 }
 
+# Source app-local modules from scripts or runtime entrypoints without assuming
+# the current working directory is the app directory.
 sc_source <- function(path, local = parent.frame(), ..., app_dir = sc_get_app_dir()) {
-  source(sc_first_existing(c(path), app_dir = app_dir), local = local, ...)
+  return(source(sc_first_existing(c(path), app_dir = app_dir), local = local, ...))
 }
 
+# Return a zero-argument loader that reads a heavy asset only on first use.
 sc_lazy_loader <- function(paths, reader = readRDS, postprocess = identity, app_dir = sc_get_app_dir()) {
   cache <- NULL
-  function() {
+  return(function() {
     if (is.null(cache)) {
       path <- sc_first_existing(paths, app_dir = app_dir)
       cache <<- postprocess(reader(path))
     }
-    cache
-  }
+    return(cache)
+  })
 }
 
+# Return a zero-argument resolver for path-only assets such as HDF5 matrices.
 sc_lazy_path <- function(paths, app_dir = sc_get_app_dir()) {
   cached_path <- NULL
-  function() {
+  return(function() {
     if (is.null(cached_path)) {
       cached_path <<- sc_first_existing(paths, app_dir = app_dir)
     }
-    cached_path
-  }
+    return(cached_path)
+  })
 }
 
+# ---------------------------------------------------------------------------
+# Gene-index normalization
+# ---------------------------------------------------------------------------
+# Uploaded or generated gene indices may arrive as named vectors, character
+# vectors, lists, or data frames. Normalize them into a named integer index so
+# ShinyCell and custom upload paths can share one lookup contract.
 sc_normalize_gene_index <- function(gene_data) {
   if (is.null(gene_data)) {
     return(NULL)
@@ -229,7 +311,7 @@ sc_normalize_gene_index <- function(gene_data) {
     if (!length(idx)) {
       return(NULL)
     }
-    names(data)[idx[1]]
+    return(names(data)[idx[1]])
   }
 
   finalize_mapping <- function(genes, idx) {
@@ -248,7 +330,7 @@ sc_normalize_gene_index <- function(gene_data) {
       genes <- make.unique(genes)
     }
     names(idx) <- genes
-    idx
+    return(idx)
   }
 
   if (is.atomic(gene_data)) {

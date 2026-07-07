@@ -1,5 +1,15 @@
 #!/usr/bin/env Rscript
 
+# ---------------------------------------------------------------------------
+# Build precomputed interactive-data assets
+# ---------------------------------------------------------------------------
+# This script reads a Seurat object and writes compact RDS summaries used by the
+# RA dotplot, RA lineplot, and spermatogenesis table. Runtime code loads these
+# summaries instead of loading a full Seurat object on shinyapps.io.
+
+# ---------------------------------------------------------------------------
+# Package imports and app-root bootstrap
+# ---------------------------------------------------------------------------
 suppressPackageStartupMessages({
   library(Seurat)
   library(Matrix)
@@ -11,9 +21,16 @@ bootstrap_dir <- if (!is.null(bootstrap_path) && nzchar(bootstrap_path)) {
 } else {
   getwd()
 }
-source(file.path(bootstrap_dir, "app_support.R"))
-app_dir <- sc_set_app_dir(sc_find_app_dir(start = sc_script_dir()))
+app_root <- normalizePath(file.path(bootstrap_dir, "..", ".."), mustWork = FALSE)
+source(file.path(app_root, "app_support.R"))
+app_dir <- sc_set_app_dir(sc_find_app_dir(start = app_root))
 
+# ---------------------------------------------------------------------------
+# Command-line arguments
+# ---------------------------------------------------------------------------
+# Usage:
+#   Rscript build_interactive_assets.R [seurat_rds] [out_dir]
+# Defaults prefer slim Data/ Seurat objects and write generated assets to Data/.
 args <- commandArgs(trailingOnly = TRUE)
 default_seurat_candidates <- c(
   "specificCellID_slim_nocounts.rds",
@@ -22,11 +39,11 @@ default_seurat_candidates <- c(
   "final_staged_object_slim_nocounts.rds"
 )
 seurat_path <- if (length(args) >= 1) {
-  sc_first_existing(c(args[[1]]), app_dir = app_dir)
+  sc_first_existing(sc_data_candidates(c(args[[1]])), app_dir = app_dir)
 } else {
-  sc_first_existing(default_seurat_candidates, app_dir = app_dir)
+  sc_first_existing(sc_data_candidates(default_seurat_candidates), app_dir = app_dir)
 }
-out_dir <- if (length(args) >= 2) sc_dir_arg(args[[2]], app_dir = app_dir) else app_dir
+out_dir <- if (length(args) >= 2) sc_dir_arg(args[[2]], app_dir = app_dir) else sc_data_dir(app_dir = app_dir, create = TRUE)
 
 if (!file.exists(seurat_path)) {
   stop(sprintf("Seurat object not found at: %s", seurat_path))
@@ -38,19 +55,24 @@ if (!dir.exists(out_dir)) {
 message(sprintf("Loading Seurat object: %s", seurat_path))
 obj <- readRDS(seurat_path)
 
+# ---------------------------------------------------------------------------
+# Assay selection
+# ---------------------------------------------------------------------------
+# RA figures historically use SCT-normalized values when available; the
+# spermatogenesis table prefers RNA values so the modal reflects RNA expression.
 read_assay_data <- function(obj, assay_name) {
   if (!(assay_name %in% Assays(obj))) {
     return(NULL)
   }
-  tryCatch(
+  return(tryCatch(
     GetAssayData(obj, assay = assay_name, layer = "data"),
     error = function(...) {
-      tryCatch(
+      return(tryCatch(
         GetAssayData(obj, assay = assay_name, slot = "data"),
         error = function(...) NULL
-      )
+      ))
     }
-  )
+  ))
 }
 
 pick_assay_data <- function(obj, assay_preferences, purpose) {
@@ -79,6 +101,8 @@ message(sprintf("Using assay '%s' for spermatogenesis table assets.", spg_assay_
 ra_expr <- ra_assay_data$mat
 spg_expr <- spg_assay_data$mat
 
+# Keep RA and table assets on one gene universe so shared search/select inputs
+# do not drift between the two interactive-data views.
 interactive_genes <- intersect(rownames(ra_expr), rownames(spg_expr))
 if (!length(interactive_genes)) {
   stop("No overlapping genes between RA assay matrix and spermatogenesis assay matrix.", call. = FALSE)
@@ -93,6 +117,8 @@ meta$sample <- as.character(meta$sample)
 meta$generalCellID <- as.character(meta$generalCellID)
 meta$generalCellID[meta$generalCellID == "Somatic"] <- "Sertoli"
 
+# Resolve the best specific-cell annotation column from current and legacy
+# Seurat exports. The chosen column drives RA identities and button summaries.
 pick_specific_col <- function(meta_df) {
   candidates <- c("specificCellID", "correct_cellTypes", "specificCellID.1")
   available <- candidates[candidates %in% colnames(meta_df)]
@@ -110,7 +136,7 @@ pick_specific_col <- function(meta_df) {
     function(col) sum(!is.na(meta_df[[col]]) & nzchar(as.character(meta_df[[col]]))),
     numeric(1)
   )
-  available[[which.max(non_na_counts)]]
+  return(available[[which.max(non_na_counts)]])
 }
 
 specific_col <- pick_specific_col(meta)
@@ -123,6 +149,11 @@ if (length(missing_cols)) {
   stop(sprintf("Missing required meta.data columns: %s", paste(missing_cols, collapse = ", ")))
 }
 
+# ---------------------------------------------------------------------------
+# Sparse group summarization
+# ---------------------------------------------------------------------------
+# Build average-expression and percent-expressed matrices using a sparse design
+# matrix. This avoids looping over genes or groups for large objects.
 summarize_by_group <- function(rna_mat, groups) {
   if (length(groups) != ncol(rna_mat)) {
     stop("Group vector length must match number of cells in expression matrix.", call. = FALSE)
@@ -139,7 +170,7 @@ summarize_by_group <- function(rna_mat, groups) {
   }
 
   groups <- factor(groups)
-  design <- Matrix::sparse.model.matrix(~0 + groups)
+  design <- Matrix::sparse.model.matrix(~ 0 + groups)
   colnames(design) <- levels(groups)
 
   n_per_group <- Matrix::colSums(design)
@@ -161,11 +192,11 @@ summarize_by_group <- function(rna_mat, groups) {
   rownames(pct) <- rownames(rna_mat)
   colnames(pct) <- colnames(design)
 
-  list(
+  return(list(
     avg = as.matrix(avg),
     pct = as.matrix(pct),
     groups = colnames(design)
-  )
+  ))
 }
 
 # ---- Gene list (full coverage) ----
@@ -189,11 +220,15 @@ stage_levels_ref <- c(
   "IX-X (Pale)",
   "XI-XII (Pale to Weak)"
 )
-sample_levels <- c(stage_levels_ref[stage_levels_ref %in% unique(meta$sample)],
-                   setdiff(unique(meta$sample), stage_levels_ref))
+sample_levels <- c(
+  stage_levels_ref[stage_levels_ref %in% unique(meta$sample)],
+  setdiff(unique(meta$sample), stage_levels_ref)
+)
 general_ref <- c("Spermatogonia", "Spermatocyte", "Round Spermatid", "Elongating Spermatid", "Sertoli")
-general_levels <- c(general_ref[general_ref %in% unique(meta$generalCellID)],
-                    setdiff(unique(meta$generalCellID), general_ref))
+general_levels <- c(
+  general_ref[general_ref %in% unique(meta$generalCellID)],
+  setdiff(unique(meta$generalCellID), general_ref)
+)
 
 sample_factor <- factor(meta$sample, levels = sample_levels)
 general_factor <- factor(meta$generalCellID, levels = general_levels)
@@ -215,6 +250,8 @@ line_arr <- array(
   )
 )
 
+# Repack the two-way group summary into a gene x sample x generalCellID array so
+# server.R can slice selected genes/stages without reshaping on every request.
 for (i in seq_along(combo_levels)) {
   s_idx <- match(combo_sample[[i]], sample_levels)
   g_idx <- match(combo_general[[i]], general_levels)
@@ -243,16 +280,18 @@ if (length(mapping_ids) == 0) {
 
 mapping_df <- do.call(rbind, lapply(mapping_ids, function(id) {
   entry <- general_button_mapping[[id]]
-  data.frame(
+  return(data.frame(
     btn_id = id,
     sample = as.character(entry$sample),
     specificCellID = as.character(entry$specificCellID),
     stringsAsFactors = FALSE
-  )
+  ))
 }))
 
 mapping_df$group_key <- paste(mapping_df$sample, mapping_df$specificCellID, sep = "__")
 
+# Button IDs are the runtime columns. Each button maps to a sample/cell-type
+# group key from button_mapping_general.R.
 meta_group_key <- paste(meta$sample, meta$specificCellID, sep = "__")
 keep_cells <- meta_group_key %in% mapping_df$group_key
 

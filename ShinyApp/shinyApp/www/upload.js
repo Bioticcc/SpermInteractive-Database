@@ -1,3 +1,9 @@
+// ---------------------------------------------------------------------------
+// User upload progress UI bridge
+// ---------------------------------------------------------------------------
+// Keeps the custom upload progress panel synchronized with the Shiny file input
+// and server-side processing state. This script is defensive because Shiny can
+// recreate input elements during UI refreshes.
 (function () {
   var statusId = "user-upload-status";
   var areaSelector = ".upload-progress-area";
@@ -5,6 +11,7 @@
   var AREA_STATES = ["uploading", "processing", "complete", "error"];
   var resetTimer = null;
 
+  // DOM lookups are wrapped because the upload UI may be absent on hidden tabs.
   function getStatusEl() {
     return document.getElementById(statusId);
   }
@@ -35,11 +42,14 @@
     }
   }
 
+  // Restore the idle message and remove visual state from the upload panel.
   function resetStatus() {
     setStatus(null, false);
     setAreaState(null);
   }
 
+  // Keep state classes mutually exclusive so CSS can target one upload phase at
+  // a time.
   function setAreaState(state) {
     var area = getAreaEl();
     if (!area) {
@@ -53,6 +63,8 @@
     }
   }
 
+  // Shiny creates its progress element outside the custom panel; move it into
+  // the panel so the app can style upload progress consistently.
   function moveProgressBar() {
     var progress = document.getElementById(progressId);
     var area = getAreaEl();
@@ -65,6 +77,8 @@
     }
   }
 
+  // Bind once per input element and mark the element to survive repeated init
+  // calls after Shiny UI updates.
   function bindFileInputListener() {
     var input = document.getElementById("user_seurat_file");
     if (!input || input.__uploadListenerBound) {
@@ -84,6 +98,7 @@
     input.__uploadListenerBound = true;
   }
 
+  // Server messages distinguish upload transport from R-side object processing.
   function handleStatusMessage(msg) {
     if (!msg || !msg.state) {
       return;
@@ -113,6 +128,8 @@
     }
   }
 
+  // Register after Shiny connects when this script loads before the client
+  // runtime is ready.
   function registerShinyHandler() {
     if (!(window.Shiny && window.Shiny.addCustomMessageHandler)) {
       return false;
@@ -124,6 +141,8 @@
     return true;
   }
 
+  // Initialize immediately when the DOM is ready, then keep hooks current when
+  // Shiny replaces the file input.
   function init() {
     bindFileInputListener();
     moveProgressBar();
