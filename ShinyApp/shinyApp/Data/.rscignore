@@ -1,0 +1,23 @@
+# Exact data filenames excluded from shinyapps.io bundles.
+M_Seurat_object.rds
+final_staged_object.rds
+final_staged_object_slim.rds
+final_staged_object_slim_nocounts.rds
+specificCellID.rds
+specificCellID_slim.rds
+specificCellID_slim_nocounts.rds
+specificCellID_Original.rds
+02_Sertoli.rds
+03_Spermatogonia_original.rds
+04_Spermatocyte_updated.rds
+05_Spermatid.rds
+sc1conf.rds
+sc1def.rds
+sc1gene.rds
+sc1gexpr.h5
+sc1meta.rds
+sc2conf.rds
+sc2def.rds
+sc2gene.rds
+sc2gexpr.h5
+sc2meta.rds
