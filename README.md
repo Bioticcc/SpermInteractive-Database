@@ -1,4 +1,4 @@
-# SpermInteractive (README IS WIP)
+# SpermInteractive
 Welcome to SpermInteractive. This database lets you generate editable figures based primarily on:
 
 - Hayden McSwiggin, *Single Nuclei Analysis of Staged Seminiferous Tubules* (Unpublished, expected mid 2026)
