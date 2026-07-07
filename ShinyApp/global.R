@@ -30,14 +30,14 @@ release_notes_file <- normalizePath(file.path(app_dir, "release_notes.csv"), mus
 # Release metadata
 # ---------------------------------------------------------------------------
 # Release metadata: edit these values before deployment.
-release_version_number <- "0.9.1"
+release_version_number <- "0.9.2"
 release_update_type <- "Major" # "Minor" or "Major"
 release_update_title <- "Tutorial Update"
 release_update_description <- paste(
   c(
-    "* Added a tutorial, allowing users to move through a series of tutorial steps to familiarize themselves with the website, and how to use and navigate it.",
-    "* Fixed various popup bugs, mainly related to spam clicking a popup button like the Download Figures button while a page was still refreshing.",
-    "* Additional minor bug fixes and improvements."
+    "* Fixed various bugs involving initial version of tutorial",
+    "* Fixed btn_2_8 not showing any gene data due to a mapping issue",
+    "* Updated internal file structure heavily, with a restructure of config files mainly."
   ),
   collapse = "\n\n"
 )
